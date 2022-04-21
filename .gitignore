@@ -1,0 +1,8 @@
+**.DS_Store
+**/.vscode
+**/._*
+**/__*
+**/.ipynb*
+**/build*
+**/test*
+**/local*
