@@ -95,6 +95,15 @@ public:
 		_axes.emplace_back(axis<T1>(n5));
 		_n123=n1*n2*n3*n4*n5;
 	}
+    hypercube(const long n1, const long n2, const long n3, const long n4, const long n5, const long n6){
+		_axes.emplace_back(axis<T1>(n1));
+		_axes.emplace_back(axis<T1>(n2));
+		_axes.emplace_back(axis<T1>(n3));
+		_axes.emplace_back(axis<T1>(n4));
+		_axes.emplace_back(axis<T1>(n5));
+		_axes.emplace_back(axis<T1>(n6));
+		_n123=n1*n2*n3*n4*n5*n6;
+	}
 	hypercube(const axis<T1> &a1) {
 		_axes.push_back(a1);
 		_n123 = (long)a1.n;
@@ -124,6 +133,15 @@ public:
 		_axes.push_back(a4);
 		_axes.push_back(a5);
 		_n123 = (long)a1.n*(long)a2.n*(long)a3.n*(long)a4.n*(long)a5.n;
+	}
+    hypercube(const axis<T1> &a1, const axis<T1> &a2, const axis<T1> &a3, const axis<T1> &a4, const axis<T1> &a5, const axis<T1> &a6) {
+		_axes.push_back(a1);
+		_axes.push_back(a2);
+		_axes.push_back(a3);
+		_axes.push_back(a4);
+		_axes.push_back(a5);
+		_axes.push_back(a6);
+		_n123 = (long)a1.n*(long)a2.n*(long)a3.n*(long)a4.n*(long)a5.n*(long)a6.n;
 	}
 	hypercube(const std::vector<axis<T1> > &axes){
 		_axes = axes;
