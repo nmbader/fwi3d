@@ -18,13 +18,13 @@ public:
     virtual ~injector(){}
 
     // forward operator: inject one sample of the source into the wavefield (single component)
-    virtual void inject(bool add, const data_t ** in, data_t * out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
+    virtual void inject(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
 
     // adjoint operator: extract one sample from the wavefield into the receiver
-    virtual void extract(bool add, const data_t * in, data_t ** out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
+    virtual void extract(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
 
-    //virtual void inject_gpu(bool add, const data_t ** in, data_t * out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
-    //virtual void extract_gpu(bool add, const data_t * in, data_t ** out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
+    //virtual void inject_gpu(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
+    //virtual void extract_gpu(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
 
 };
 
@@ -56,11 +56,11 @@ public:
 
     // find needed indices and weights on given grid
     void findIndicesWeights(const hypercube<data_t> &range, const std::vector<std::vector<data_t> > &loc);
-    void inject(bool add, const data_t ** in, data_t * out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
-    void extract(bool add, const data_t * in, data_t ** out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
+    void inject(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const;
+    void extract(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const;
 
-    //void inject_gpu(bool add, const data_t ** in, data_t * out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
-    //void extract_gpu(bool add, const data_t * in, data_t ** out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
+    //void inject_gpu(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const;
+    //void extract_gpu(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const;
 
 };
 
@@ -85,11 +85,11 @@ public:
     }
 
     void findIndicesWeights(const hypercube<data_t> &range, const std::vector<std::vector<data_t> > &loc);
-    void inject(bool add, const data_t ** in, data_t * out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
-    void extract(bool add, const data_t * in, data_t ** out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
+    void inject(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const;
+    void extract(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const;
 
-    //void inject_gpu(bool add, const data_t ** in, data_t * out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
-    //void extract_gpu(bool add, const data_t * in, data_t ** out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
+    //void inject_gpu(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const;
+    //void extract_gpu(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const;
 
 };
 
@@ -115,10 +115,10 @@ public:
     }
 
     void findIndicesWeights(const hypercube<data_t> &range, const std::vector<std::vector<data_t> > &loc, data_t gl);
-    void inject(bool add, const data_t ** in, data_t * out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
-    void extract(bool add, const data_t * in, data_t ** out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
+    void inject(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const;
+    void extract(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const;
 
-    //void inject_gpu(bool add, const data_t ** in, data_t * out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
-    //void extract_gpu(bool add, const data_t * in, data_t ** out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const = 0;
+    //void inject_gpu(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const;
+    //void extract_gpu(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const;
 
 };

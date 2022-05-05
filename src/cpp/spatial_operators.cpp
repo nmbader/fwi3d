@@ -3,6 +3,10 @@
 #include <omp.h>
 #include "spatial_operators.hpp"
 
+#define IZ(iz) (iy*nx*nz+ix*nz+iz)
+#define IX(ix) (iy*nx*nz+(ix)*nz+iz)
+#define IY(iy) ((iy)*nx*nz+ix*nz+iz)
+
 void applyHz(bool inv, bool add, const data_t* in, data_t* out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax){
 
     int izminb=std::max(4,izmin);
@@ -399,3 +403,173 @@ void mult_Dy(bool add, const data_t* in, data_t* out, int nx, int ny, int nz, da
         }
     }
 }
+
+void esat_Dz_top(bool add, const data_t* in, data_t* __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int iymin, int iymax, const data_t * par){
+    
+    data_t bnd_coef[24] = {-24.0/17,59.0/34,-4.0/17,-3.0/34,0,0,-0.5,0,0.5,0,0,0,4.0/43,-59.0/86,0,59.0/86,-4.0/43,0,3.0/98,0,-59.0/98,0,32.0/49,-4.0/49};
+    data_t h0 = 17.0/48;
+    int nc2=6;
+    data_t adh = 1.0/(d*d*h0);
+
+    data_t sum;
+
+    // additional SAT = - Hz-1.(-f.Dz.in)_0
+    #pragma omp parallel for private(sum)
+    for (int iy=iymin; iy<iymax; iy++){
+        for (int ix = ixmin; ix < ixmax; ix++){
+
+            // -(Dz.in)_0
+            int i=0;
+            sum=0;
+            for (i=0; i<nc2; i++){
+                sum -= bnd_coef[i] * in[IZ(i)];
+            }
+            i=0;
+            out[IZ(i)] = add*out[IZ(i)] - adh * par[IZ(i)]*sum;
+        }
+    }
+}
+
+void esat_Dz_bottom(bool add, const data_t* in, data_t* __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int iymin, int iymax, const data_t * par){
+    
+    data_t bnd_coef[24] = {-24.0/17,59.0/34,-4.0/17,-3.0/34,0,0,-0.5,0,0.5,0,0,0,4.0/43,-59.0/86,0,59.0/86,-4.0/43,0,3.0/98,0,-59.0/98,0,32.0/49,-4.0/49};
+    data_t h0 = 17.0/48;
+    int nc2=6;
+    data_t adh = 1.0/(d*d*h0);
+
+    data_t sum;
+
+    // additional SAT = - Hz-1.(f.Dz.in)_0
+    #pragma omp parallel for private(sum)
+    for (int iy=iymin; iy<iymax; iy++){
+        for (int ix = ixmin; ix < ixmax; ix++){
+
+            // (Dz.in)_0
+            int i=0;
+            sum=0;
+            for (i=0; i<nc2; i++){
+                sum -= bnd_coef[i] * in[IZ(nz-1-i)];
+            }
+            i=nz-1;
+            out[IZ(i)] = add*out[IZ(i)] - adh * par[IZ(i)]*sum;
+        }
+    }
+}
+
+void esat_Dx_left(bool add, const data_t* in, data_t* __restrict out, int nx, int ny, int nz, data_t d, int iymin, int iymax, int izmin, int izmax, const data_t * par){
+    
+    data_t bnd_coef[24] = {-24.0/17,59.0/34,-4.0/17,-3.0/34,0,0,-0.5,0,0.5,0,0,0,4.0/43,-59.0/86,0,59.0/86,-4.0/43,0,3.0/98,0,-59.0/98,0,32.0/49,-4.0/49};
+    data_t h0 = 17.0/48;
+    int nc2=6;
+    data_t adh = 1.0/(d*d*h0);
+
+    data_t sum;
+
+    // additional SAT = - Hx-1.(-f.Dx.in)_0
+    #pragma omp parallel for private(sum)
+    for (int iy=iymin; iy<iymax; iy++){
+        for (int iz = izmin; iz < izmax; iz++){
+
+            // -(Dx.in)_0
+            int i=0;
+            sum=0;
+            for (i=0; i<nc2; i++){
+                sum -= bnd_coef[i] * in[IX(i)];
+            }
+            i=0;
+            out[IX(i)] = add*out[IX(i)] - adh * par[IX(i)]*sum;
+        }
+    }
+}
+
+void esat_Dx_right(bool add, const data_t* in, data_t* __restrict out, int nx, int ny, int nz, data_t d, int iymin, int iymax, int izmin, int izmax, const data_t * par){
+    
+    data_t bnd_coef[24] = {-24.0/17,59.0/34,-4.0/17,-3.0/34,0,0,-0.5,0,0.5,0,0,0,4.0/43,-59.0/86,0,59.0/86,-4.0/43,0,3.0/98,0,-59.0/98,0,32.0/49,-4.0/49};
+    data_t h0 = 17.0/48;
+    int nc2=6;
+    data_t adh = 1.0/(d*d*h0);
+
+    data_t sum;
+
+    // additional SAT = - Hx-1.(f.Dx.in)_0
+    #pragma omp parallel for private(sum)
+    for (int iy=iymin; iy<iymax; iy++){
+        for (int iz = izmin; iz < izmax; iz++){
+
+            // (Dx.in)_0
+            int i=0;
+            sum=0;
+            for (i=0; i<nc2; i++){
+                sum -= bnd_coef[i] * in[IX(nx-1-i)];
+            }
+            i=nx-1;
+            out[IX(i)] = add*out[IX(i)] - adh * par[IX(i)]*sum;
+        }
+    }
+}
+
+void esat_Dy_front(bool add, const data_t* in, data_t* __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int izmin, int izmax, const data_t * par){
+    
+    data_t bnd_coef[24] = {-24.0/17,59.0/34,-4.0/17,-3.0/34,0,0,-0.5,0,0.5,0,0,0,4.0/43,-59.0/86,0,59.0/86,-4.0/43,0,3.0/98,0,-59.0/98,0,32.0/49,-4.0/49};
+    data_t h0 = 17.0/48;
+    int nc2=6;
+    data_t adh = 1.0/(d*d*h0);
+
+    data_t sum;
+
+    // additional SAT = - Hy-1.(-f.Dy.in)_0
+    #pragma omp parallel for private(sum)
+    for (int ix=ixmin; ix<ixmax; ix++){
+        for (int iz = izmin; iz < izmax; iz++){
+
+            // -(Dy.in)_0
+            int i=0;
+            sum=0;
+            for (i=0; i<nc2; i++){
+                sum -= bnd_coef[i] * in[IY(i)];
+            }
+            i=0;
+            out[IY(i)] = add*out[IY(i)] - adh * par[IY(i)]*sum;
+        }
+    }
+}
+
+void esat_Dy_back(bool add, const data_t* in, data_t* __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int izmin, int izmax, const data_t * par){
+    
+    data_t bnd_coef[24] = {-24.0/17,59.0/34,-4.0/17,-3.0/34,0,0,-0.5,0,0.5,0,0,0,4.0/43,-59.0/86,0,59.0/86,-4.0/43,0,3.0/98,0,-59.0/98,0,32.0/49,-4.0/49};
+    data_t h0 = 17.0/48;
+    int nc2=6;
+    data_t adh = 1.0/(d*d*h0);
+
+    data_t sum;
+
+    // additional SAT = - Hy-1.(f.Dy.in)_0
+    #pragma omp parallel for private(sum)
+    for (int ix=ixmin; ix<ixmax; ix++){
+        for (int iz = izmin; iz < izmax; iz++){
+
+            // (Dy.in)_0
+            int i=0;
+            sum=0;
+            for (i=0; i<nc2; i++){
+                sum -= bnd_coef[i] * in[IY(ny-1-i)];
+            }
+            i=ny-1;
+            out[IY(i)] = add*out[IY(i)] - adh * par[IY(i)]*sum;
+        }
+    }
+}
+
+void taperz(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, data_t a){
+
+}
+void taperx(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, data_t a){
+    
+}
+void tapery(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, data_t a){
+    
+}
+
+#undef IZ
+#undef IX
+#undef IY

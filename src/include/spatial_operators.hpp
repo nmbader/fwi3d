@@ -24,6 +24,20 @@ void mult_Dz(bool add, const data_t* in, data_t* out, int nx, int ny, int nz, da
 void mult_Dx(bool add, const data_t* in, data_t* out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, const data_t * par);
 void mult_Dy(bool add, const data_t* in, data_t* out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, const data_t * par);
 
+// Apply derivative operator orthogonal to the boundary, to complement the SAT terms
+void esat_Dz_top(bool add, const data_t * in, data_t * __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int iymin, int iymax, const data_t * par);
+void esat_Dz_bottom(bool add, const data_t * in, data_t * __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int iymin, int iymax, const data_t * par);
+void esat_Dx_left(bool add, const data_t * in, data_t * __restrict out, int nx, int ny, int nz, data_t d, int iymin, int iymax, int izmin, int izmax, const data_t * par);
+void esat_Dx_right(bool add, const data_t * in, data_t * __restrict out, int nx, int ny, int nz, data_t d, int iymin, int iymax, int izmin, int izmax, const data_t * par);
+void esat_Dy_front(bool add, const data_t * in, data_t * __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int izmin, int izmax, const data_t * par);
+void esat_Dy_back(bool add, const data_t * in, data_t * __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int izmin, int izmax, const data_t * par);
+
+// Apply cosine^2 taper to damp the wavefield (to use in conjunction with absorbing SAT)
+// taper = cos[a * pi/2 * (i - istart)/(iend-istart)]^2 ; 0 <= a <= 1
+void taperz(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, data_t a);
+void taperx(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, data_t a);
+void tapery(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, data_t a);
+
 // second derivative operators with variable parameters, defined as template function to accomodate different expressions of parameters
 template<expr f>
 void Dzz_var(bool add, const data_t* in, data_t* __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, const data_t ** par, data_t a){

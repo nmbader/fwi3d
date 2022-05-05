@@ -81,7 +81,7 @@ void delta_m3::findIndicesWeights(const hypercube<data_t> &range, const std::vec
     }
 }
 
-void delta_m3::inject(bool add, const data_t ** in, data_t * out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const {
+void delta_m3::inject(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const {
 
     const int (* p_xind) [3] = (const int (*) [3]) xind;
     const int (* p_yind) [3] = (const int (*) [3]) yind;
@@ -89,7 +89,7 @@ void delta_m3::inject(bool add, const data_t ** in, data_t * out, int nx, int ny
     const data_t (* p_xw) [2][3] = (const data_t (*) [2][3]) xw;
     const data_t (* p_yw) [2][3] = (const data_t (*) [2][3]) yw;
     const data_t (* p_zw) [2][3] = (const data_t (*) [2][3]) zw;
-    const data_t (* p_in) [nt] = (const data_t (*) [nt]) in[0];
+    const data_t (* p_in) [npts][nt] = (const data_t (*) [npts][nt]) in;
     data_t (* p_out) [nx][nz] = (data_t (*) [nx][nz]) out;
 
     if (!add) {
@@ -108,14 +108,14 @@ void delta_m3::inject(bool add, const data_t ** in, data_t * out, int nx, int ny
         for (int iy=0; iy<3; iy++){
             for (int ix=0; ix<3; ix++){
                 for (int iz=0; iz<3; iz++){
-                    p_out[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]] += p_yw[itr][0][iy] * p_xw[itr][0][ix] * p_zw[itr][0][iz] * p_in[itr][it];
+                    p_out[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]] += p_yw[itr][0][iy] * p_xw[itr][0][ix] * p_zw[itr][0][iz] * p_in[icomp][itr][it];
                 }
             }
         }
     }
 }
 
-void delta_m3::extract(bool add, const data_t * in, data_t ** out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const {
+void delta_m3::extract(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const {
 
     const int (* p_xind) [3] = (const int (*) [3]) xind;
     const int (* p_yind) [3] = (const int (*) [3]) yind;
@@ -124,15 +124,15 @@ void delta_m3::extract(bool add, const data_t * in, data_t ** out, int nx, int n
     const data_t (* p_yw) [2][3] = (const data_t (*) [2][3]) yw;
     const data_t (* p_zw) [2][3] = (const data_t (*) [2][3]) zw;
     const data_t (* p_in) [nx][nz] = (const data_t (*) [nx][nz]) in;
-    data_t (* p_out) [nt] = (data_t (*) [nt]) out[0];
+    data_t (* p_out) [npts][nt] = (data_t (*) [npts][nt]) out;
 
     #pragma omp parallel for
     for (int itr = itr_min; itr < itr_max; itr++){
-        p_out[itr][it] = add*p_out[itr][it];
+        p_out[icomp][itr][it] = add*p_out[icomp][itr][it];
         for (int iy=0; iy<3; iy++){
             for (int ix=0; ix<3; ix++){
                 for (int iz=0; iz<3; iz++){
-                    p_out[itr][it] += p_yw[itr][1][iy] * p_xw[itr][1][ix] * p_zw[itr][1][iz] * p_in[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]];
+                    p_out[icomp][itr][it] += p_yw[itr][1][iy] * p_xw[itr][1][ix] * p_zw[itr][1][iz] * p_in[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]];
                 }
             }
         }
@@ -238,7 +238,7 @@ void ddelta_m3::findIndicesWeights(const hypercube<data_t> &range, const std::ve
     }
 }
 
-void ddelta_m3::inject(bool add, const data_t ** in, data_t * out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const {
+void ddelta_m3::inject(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const {
 
     const int (* p_xind) [3] = (const int (*) [3]) xind;
     const int (* p_yind) [3] = (const int (*) [3]) yind;
@@ -246,10 +246,13 @@ void ddelta_m3::inject(bool add, const data_t ** in, data_t * out, int nx, int n
     const data_t (* p_xw) [2][6] = (const data_t (*) [2][6]) xw;
     const data_t (* p_yw) [2][6] = (const data_t (*) [2][6]) yw;
     const data_t (* p_zw) [2][6] = (const data_t (*) [2][6]) zw;
-    const data_t (* p_inx) [nt] = (const data_t (*) [nt]) in[0];
-    const data_t (* p_iny) [nt] = (const data_t (*) [nt]) in[1];
-    const data_t (* p_inz) [nt] = (const data_t (*) [nt]) in[2];
+    const data_t (* p_in) [npts][nt] = (const data_t (*) [npts][nt]) in;
     data_t (* p_out) [nx][nz] = (data_t (*) [nx][nz]) out;
+
+    int icx, icy, icz;
+    if (icomp==0){icx=0; icy=3; icz=4;}
+    else if (icomp==1) {icx=3; icy=1; icz=5;}
+    else {icx=4; icy=5; icz=2;}
 
     if (!add) {
         for (int itr = itr_min; itr < itr_max; itr++){
@@ -267,14 +270,14 @@ void ddelta_m3::inject(bool add, const data_t ** in, data_t * out, int nx, int n
         for (int iy=0; iy<3; iy++){
             for (int ix=0; ix<3; ix++){
                 for (int iz=0; iz<3; iz++){
-                    p_out[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]] += (-p_xw[itr][0][ix+3] * p_yw[itr][0][iy] * p_zw[itr][0][iz] * p_inx[itr][it] - p_xw[itr][0][ix] * p_yw[itr][0][iy+3] * p_zw[itr][0][iz] * p_iny[itr][it] - p_xw[itr][0][ix] * p_yw[itr][0][iy] * p_zw[itr][0][iz+3] * p_inz[itr][it]);
+                    p_out[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]] += (-p_xw[itr][0][ix+3] * p_yw[itr][0][iy] * p_zw[itr][0][iz] * p_in[icx][itr][it] - p_xw[itr][0][ix] * p_yw[itr][0][iy+3] * p_zw[itr][0][iz] * p_in[icy][itr][it] - p_xw[itr][0][ix] * p_yw[itr][0][iy] * p_zw[itr][0][iz+3] * p_in[icz][itr][it]);
                 }
             }
         }
     }
 }
 
-void ddelta_m3::extract(bool add, const data_t * in, data_t ** out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const {
+void ddelta_m3::extract(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const {
 
     const int (* p_xind) [3] = (const int (*) [3]) xind;
     const int (* p_yind) [3] = (const int (*) [3]) yind;
@@ -283,21 +286,24 @@ void ddelta_m3::extract(bool add, const data_t * in, data_t ** out, int nx, int 
     const data_t (* p_yw) [2][6] = (const data_t (*) [2][6]) yw;
     const data_t (* p_zw) [2][6] = (const data_t (*) [2][6]) zw;
     const data_t (* p_in) [nx][nz] = (const data_t (*) [nx][nz]) in;
-    data_t (* p_outx) [nt] = (data_t (*) [nt]) out[0];
-    data_t (* p_outy) [nt] = (data_t (*) [nt]) out[1];
-    data_t (* p_outz) [nt] = (data_t (*) [nt]) out[2];
+    data_t (* p_out) [npts][nt] = (data_t (*) [npts][nt]) out;
+
+    int icx, icy, icz;
+    if (icomp==0){icx=0; icy=3; icz=4;}
+    else if (icomp==1) {icx=3; icy=1; icz=5;}
+    else {icx=4; icy=5; icz=2;}
 
     #pragma omp parallel for
     for (int itr = itr_min; itr < itr_max; itr++){
-        p_outx[itr][it] = add*p_outx[itr][it];
-        p_outy[itr][it] = add*p_outy[itr][it];
-        p_outz[itr][it] = add*p_outz[itr][it];
+        p_out[icx][itr][it] = add*p_out[icx][itr][it];
+        p_out[icy][itr][it] = add*p_out[icy][itr][it];
+        p_out[icz][itr][it] = add*p_out[icz][itr][it];
         for (int iy=0; iy<3; iy++){
             for (int ix=0; ix<3; ix++){
                 for (int iz=0; iz<3; iz++){
-                    p_outx[itr][it] = p_outx[itr][it] - p_xw[itr][1][ix+3] * p_yw[itr][1][iy] * p_zw[itr][1][iz] * p_in[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]];
-                    p_outy[itr][it] = p_outy[itr][it] - p_xw[itr][1][ix] * p_yw[itr][1][iy+3] * p_zw[itr][1][iz] * p_in[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]];
-                    p_outz[itr][it] = p_outz[itr][it] - p_xw[itr][1][ix] * p_yw[itr][1][iy] * p_zw[itr][1][iz+3] * p_in[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]];
+                    p_out[icx][itr][it] = p_out[icx][itr][it] - p_xw[itr][1][ix+3] * p_yw[itr][1][iy] * p_zw[itr][1][iz] * p_in[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]];
+                    p_out[icy][itr][it] = p_out[icy][itr][it] - p_xw[itr][1][ix] * p_yw[itr][1][iy+3] * p_zw[itr][1][iz] * p_in[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]];
+                    p_out[icz][itr][it] = p_out[icz][itr][it] - p_xw[itr][1][ix] * p_yw[itr][1][iy] * p_zw[itr][1][iz+3] * p_in[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]];
                 }
             }
         }
@@ -424,7 +430,7 @@ void dipole_m3::findIndicesWeights(const hypercube<data_t> &range, const std::ve
     }
 }
 
-void dipole_m3::inject(bool add, const data_t ** in, data_t * out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const {
+void dipole_m3::inject(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const {
 
     const int (* p_xind) [6] = (const int (*) [6]) xind;
     const int (* p_yind) [6] = (const int (*) [6]) yind;
@@ -432,7 +438,7 @@ void dipole_m3::inject(bool add, const data_t ** in, data_t * out, int nx, int n
     const data_t (* p_xw) [2][6] = (const data_t (*) [2][6]) xw;
     const data_t (* p_yw) [2][6] = (const data_t (*) [2][6]) yw;
     const data_t (* p_zw) [2][6] = (const data_t (*) [2][6]) zw;
-    const data_t (* p_in) [nt] = (const data_t (*) [nt]) in[0];
+    const data_t (* p_in) [npts][nt] = (const data_t (*) [npts][nt]) in;
     data_t (* p_out) [nx][nz] = (data_t (*) [nx][nz]) out;
 
 
@@ -453,15 +459,15 @@ void dipole_m3::inject(bool add, const data_t ** in, data_t * out, int nx, int n
         for (int iy=0; iy<3; iy++){
             for (int ix=0; ix<3; ix++){
                 for (int iz=0; iz<3; iz++){
-                    p_out[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]] -= p_xw[itr][0][ix] * p_yw[itr][0][iy] * p_zw[itr][0][iz] * p_in[itr][it];
-                    p_out[p_yind[itr][iy+3]][p_xind[itr][ix+3]][p_zind[itr][iz+3]] += p_xw[itr][0][ix+3] * p_yw[itr][0][iy+3] * p_zw[itr][0][iz+3] * p_in[itr][it];
+                    p_out[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]] -= p_xw[itr][0][ix] * p_yw[itr][0][iy] * p_zw[itr][0][iz] * p_in[icomp][itr][it];
+                    p_out[p_yind[itr][iy+3]][p_xind[itr][ix+3]][p_zind[itr][iz+3]] += p_xw[itr][0][ix+3] * p_yw[itr][0][iy+3] * p_zw[itr][0][iz+3] * p_in[icomp][itr][it];
                 }
             }
         }
     }
 }
 
-void dipole_m3::extract(bool add, const data_t * in, data_t ** out, int nx, int ny, int nz, int nt, int npts, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const {
+void dipole_m3::extract(bool add, const data_t * in, data_t * out, int nx, int ny, int nz, int nt, int npts, int icomp, int it, int itr_min, int itr_max, const int * xind, const int * yind, const int * zind, const data_t * xw, const data_t * yw, const data_t * zw) const {
 
     const int (* p_xind) [6] = (const int (*) [6]) xind;
     const int (* p_yind) [6] = (const int (*) [6]) yind;
@@ -470,15 +476,15 @@ void dipole_m3::extract(bool add, const data_t * in, data_t ** out, int nx, int 
     const data_t (* p_yw) [2][6] = (const data_t (*) [2][6]) yw;
     const data_t (* p_zw) [2][6] = (const data_t (*) [2][6]) zw;
     const data_t (* p_in) [nx][nz] = (const data_t (*) [nx][nz]) in;
-    data_t (* p_out) [nt] = (data_t (*) [nt]) out[0];
+    data_t (* p_out) [npts][nt] = (data_t (*) [npts][nt]) out;
 
     #pragma omp parallel for
     for (int itr = itr_min; itr < itr_max; itr++){
-        p_out[itr][it] = add*p_out[itr][it];
+        p_out[icomp][itr][it] = add*p_out[icomp][itr][it];
         for (int iy=0; iy<3; iy++){
             for (int ix=0; ix<3; ix++){
                 for (int iz=0; iz<3; iz++){
-                    p_out[itr][it] += p_xw[itr][1][ix+3] * p_yw[itr][1][iy+3] * p_zw[itr][1][iz+3] * p_in[p_yind[itr][iy+3]][p_xind[itr][ix+3]][p_zind[itr][iz+3]]
+                    p_out[icomp][itr][it] += p_xw[itr][1][ix+3] * p_yw[itr][1][iy+3] * p_zw[itr][1][iz+3] * p_in[p_yind[itr][iy+3]][p_xind[itr][ix+3]][p_zind[itr][iz+3]]
                                     - p_xw[itr][1][ix] * p_yw[itr][1][iy] * p_zw[itr][1][iz] * p_in[p_yind[itr][iy]][p_xind[itr][ix]][p_zind[itr][iz]];
                 }
             }

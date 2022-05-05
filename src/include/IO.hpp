@@ -46,16 +46,16 @@ void sepWrite(const std::shared_ptr<vecReg<T> > vec, std::string output){
     else auxputch(esize.c_str(),"d",&size,out);
 
     if (sizeof(T)==4){
-        successCheck(4*n123 == srite_big(out,vec->getVals(),4*n123), __FILE__,__LINE__,"Cannot write data\n");
+        successCheck(4*n123 == srite_big(out,vec->getVals(),4*n123), "Cannot write data\n");
     }
     else if (sizeof(T)==8){
         float* val = new float[n123];
         for (int i=0; i<n123; i++) val[i] = vec->getVals()[i];
-        successCheck(4*n123 == srite_big(out,val,4*n123), __FILE__,__LINE__,"Cannot write data\n");
+        successCheck(4*n123 == srite_big(out,val,4*n123), "Cannot write data\n");
         delete val;
     }
     else{
-        successCheck(false, __FILE__,__LINE__,"Cannot write the current template vector.\n");
+        successCheck(false, "Cannot write the current template vector.\n");
     }
 }
 
@@ -165,16 +165,16 @@ std::shared_ptr<vecReg<T> > sepRead(std::string input, int ndim0=1){
     std::shared_ptr<vecReg<T> > vec = std::make_shared<vecReg<T> > (hyper);
 
     if (sizeof(T)==4){
-        successCheck(4*n123 == sreed(data,vec->getVals(),4*n123), __FILE__,__LINE__,"Cannot read data\n");
+        successCheck(4*n123 == sreed(data,vec->getVals(),4*n123), "Cannot read data\n");
     }
     else if (sizeof(T)==8){
         float* val = new float[n123];
-        successCheck(4*n123 == sreed(data,val,4*n123), __FILE__,__LINE__,"Cannot read data\n");
+        successCheck(4*n123 == sreed(data,val,4*n123), "Cannot read data\n");
         for (int i=0; i<n123; i++) vec->getVals()[i]=val[i];
         delete val;
     }
 	else{
-        successCheck(false, __FILE__,__LINE__,"Cannot read into the current template vector.\n");
+        successCheck(false, "Cannot read into the current template vector.\n");
     }
 
     return vec;
@@ -193,7 +193,7 @@ void binWrite(const std::shared_ptr<vecReg<T> > vec, std::string output, std::st
     std::ofstream output_file;
     output_file.open(output);
     std::string msg = "The output file "+output+" could not be created. Check for the path\n";
-    successCheck(output_file.is_open(),__FILE__,__LINE__,msg.c_str());
+    successCheck(output_file.is_open(),msg.c_str());
     for (int i=0; i<axes.size(); i++){
         ni = "n" + std::to_string(i+1);
         oi = "o" + std::to_string(i+1);
@@ -223,7 +223,7 @@ void binWrite(const std::shared_ptr<vecReg<T> > vec, std::string output, std::st
     T * pdata = vec->getVals();
     pFile = fopen (bin_output.c_str(), "wb");
     msg = "The output file "+bin_output+" could not be created. Check the path\n";
-    successCheck(pFile!=NULL,__FILE__,__LINE__,msg.c_str());
+    successCheck(pFile!=NULL,msg.c_str());
     fwrite (pdata , sizeof(T), n123, pFile);
     fclose (pFile);
 }
@@ -240,7 +240,7 @@ std::shared_ptr<vecReg<T> > binRead(std::string input, int ndim0=1){
 
     std::ifstream ifs (input, std::ifstream::in);
     std::string msg = "The input file "+input+" could not be opened. Check the path or the file name\n";
-    successCheck(ifs.is_open(),__FILE__,__LINE__,msg.c_str());
+    successCheck(ifs.is_open(),msg.c_str());
 
     std::string line;
     while ( getline (ifs, line) )
@@ -400,7 +400,7 @@ std::shared_ptr<vecReg<T> > binRead(std::string input, int ndim0=1){
     FILE * pFile;
     pFile = fopen (in.c_str(), "rb");
     msg = "The input file "+in+" could not be read. Check the path or the file name\n";
-    successCheck(pFile!=NULL,__FILE__,__LINE__,msg.c_str());
+    successCheck(pFile!=NULL,msg.c_str());
 
     // obtain file size in bytes:
     fseek (pFile , 0 , SEEK_END);
@@ -408,12 +408,12 @@ std::shared_ptr<vecReg<T> > binRead(std::string input, int ndim0=1){
     rewind (pFile);
 
     msg = "The binary file contains "+std::to_string(lSize)+" bytes whereas the description file suggests "+std::to_string(n123*esize)+" bytes\n";
-    successCheck(lSize==n123*sizeof(T),__FILE__,__LINE__,msg.c_str());
+    successCheck(lSize==n123*sizeof(T),msg.c_str());
 
     long result = fread(pdata, sizeof(T), n123, pFile);
 
     msg = "The binary file was not read properly. It may be that the requested data type and esize are inconsistent\n";
-    successCheck(result==n123,__FILE__,__LINE__,msg.c_str());
+    successCheck(result==n123,msg.c_str());
 
     return vec;
 }
