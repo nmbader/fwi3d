@@ -294,7 +294,7 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
             sumx=0;
             sumy=0;
             for (int j=0; j<nc2; j++){
-                sumx += bnd_coef[ix*nc2+j] * in[0][IX(j)];
+                sumx += bnd_coef[ix*nc2+j] * in[0][IXYZ(j,ny-1-iy,iz)];
                 sumy -= bnd_coef[iy*nc2+j] * in[1][IY(ny-1-j)];
             }
 
@@ -342,7 +342,7 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
             sumy=0;
             for (int j=0; j<nc2; j++){
                 sumx -= bnd_coef[ix*nc2+j] * in[0][IX(nx-1-j)];
-                sumy += bnd_coef[iy*nc2+j] * in[1][IY(j)];
+                sumy += bnd_coef[iy*nc2+j] * in[1][IXYZ(nx-1-ix,j,iz)];
             }
 
             // (Sz.in3)_0
@@ -365,8 +365,8 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
             sumx=0;
             sumy=0;
             for (int j=0; j<nc2; j++){
-                sumx -= bnd_coef[ix*nc2+j] * in[0][IX(nx-1-j)];
-                sumy -= bnd_coef[iy*nc2+j] * in[1][IY(ny-1-j)];
+                sumx -= bnd_coef[ix*nc2+j] * in[0][IXYZ(nx-1-j,ny-1-iy,iz)];
+                sumy -= bnd_coef[iy*nc2+j] * in[1][IXYZ(nx-1-ix,ny-1-j,iz)];
             }
 
             // (Sz.in3)_0
@@ -390,7 +390,7 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
             for (int j=0; j<nc2; j++){
                 sumx -= bnd_coef[ix*nc2+j] * in[0][IX(nx-1-j)];
             }
-            sumy = coef[0] * (in[1][IY(iy+1)]-in[1][IY(iy-1)]) + coef[1] * (in[1][IY(iy+2)]-in[1][IY(iy-2)]);
+            sumy = coef[0] * (in[1][IXYZ(nx-1-ix,iy+1,iz)]-in[1][IXYZ(nx-1-ix,iy-1,iz)]) + coef[1] * (in[1][IXYZ(nx-1-ix,iy+2,iz)]-in[1][IXYZ(nx-1-ix,iy-2,iz)]);
 
             // (Sz.in3)_0
             sumz = 0;
@@ -432,7 +432,7 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
 
             // (Dx.in1)_0 and (Dy.in2)_0
             int iz=0;
-            sumx = coef[0] * (in[0][IX(ix+1)]-in[0][IX(ix-1)]) + coef[1] * (in[0][IX(ix+2)]-in[0][IX(ix-2)]);
+            sumx = coef[0] * (in[0][IXYZ(ix+1,ny-1-iy,iz)]-in[0][IXYZ(ix-1,ny-1-iy,iz)]) + coef[1] * (in[0][IXYZ(ix+2,ny-1-iy,iz)]-in[0][IXYZ(ix-2,ny-1-iy,iz)]);
             sumy=0;
             for (int j=0; j<nc2; j++){
                 sumy -= bnd_coef[iy*nc2+j] * in[1][IY(ny-1-j)];
@@ -494,7 +494,7 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
         for (int ix=ixmin; ix<nc1; ix++){
 
             // (Dx.in1)_0 and (Dy.in2)_0
-            int iz=0;
+            int iz=nz-1;
             sumx=0;
             sumy=0;
             for (int j=0; j<nc2; j++){
@@ -518,11 +518,11 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
         for (int ix=ixmin; ix<nc1; ix++){
 
             // (Dx.in1)_0 and (Dy.in2)_0
-            int iz=0;
+            int iz=nz-1;
             sumx=0;
             sumy=0;
             for (int j=0; j<nc2; j++){
-                sumx += bnd_coef[ix*nc2+j] * in[0][IX(j)];
+                sumx += bnd_coef[ix*nc2+j] * in[0][IXYZ(j,ny-1-iy,iz)];
                 sumy -= bnd_coef[iy*nc2+j] * in[1][IY(ny-1-j)];
             }
 
@@ -542,7 +542,7 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
         for (int ix=ixmin; ix<nc1; ix++){
 
             // (Dx.in1)_0 and (Dy.in2)_0
-            int iz=0;
+            int iz=nz-1;
             sumx=0;
             for (int j=0; j<nc2; j++){
                 sumx += bnd_coef[ix*nc2+j] * in[0][IX(j)];
@@ -565,12 +565,12 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
         for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
 
             // (Dx.in1)_0 and (Dy.in2)_0
-            int iz=0;
+            int iz=nz-1;
             sumx=0;
             sumy=0;
             for (int j=0; j<nc2; j++){
                 sumx -= bnd_coef[ix*nc2+j] * in[0][IX(nx-1-j)];
-                sumy += bnd_coef[iy*nc2+j] * in[1][IY(j)];
+                sumy += bnd_coef[iy*nc2+j] * in[1][IXYZ(nx-1-ix,j,iz)];
             }
 
             // (Sz.in3)_0
@@ -589,12 +589,12 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
         for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
 
             // (Dx.in1)_0 and (Dy.in2)_0
-            int iz=0;
+            int iz=nz-1;
             sumx=0;
             sumy=0;
             for (int j=0; j<nc2; j++){
-                sumx -= bnd_coef[ix*nc2+j] * in[0][IX(nx-1-j)];
-                sumy -= bnd_coef[iy*nc2+j] * in[1][IY(ny-1-j)];
+                sumx -= bnd_coef[ix*nc2+j] * in[0][IXYZ(nx-1-j,ny-1-iy,iz)];
+                sumy -= bnd_coef[iy*nc2+j] * in[1][IXYZ(nx-1-ix,ny-1-j,iz)];
             }
 
             // (Sz.in3)_0
@@ -613,12 +613,12 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
         for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
 
             // (Dx.in1)_0 and (Dy.in2)_0
-            int iz=0;
+            int iz=nz-1;
             sumx=0;
             for (int j=0; j<nc2; j++){
                 sumx -= bnd_coef[ix*nc2+j] * in[0][IX(nx-1-j)];
             }
-            sumy = coef[0] * (in[1][IY(iy+1)]-in[1][IY(iy-1)]) + coef[1] * (in[1][IY(iy+2)]-in[1][IY(iy-2)]);
+            sumy = coef[0] * (in[1][IXYZ(nx-1-ix,iy+1,iz)]-in[1][IXYZ(nx-1-ix,iy-1,iz)]) + coef[1] * (in[1][IXYZ(nx-1-ix,iy+2,iz)]-in[1][IXYZ(nx-1-ix,iy-2,iz)]);
 
             // (Sz.in3)_0
             sumz = 0;
@@ -636,7 +636,7 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
         for (int ix=ixminb; ix<ixmaxb; ix++){
 
             // (Dx.in1)_0 and (Dy.in2)_0
-            int iz=0;
+            int iz=nz-1;
             sumx = coef[0] * (in[0][IX(ix+1)]-in[0][IX(ix-1)]) + coef[1] * (in[0][IX(ix+2)]-in[0][IX(ix-2)]);
             sumy=0;
             for (int j=0; j<nc2; j++){
@@ -659,8 +659,8 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
         for (int ix=ixminb; ix<ixmaxb; ix++){
 
             // (Dx.in1)_0 and (Dy.in2)_0
-            int iz=0;
-            sumx = coef[0] * (in[0][IX(ix+1)]-in[0][IX(ix-1)]) + coef[1] * (in[0][IX(ix+2)]-in[0][IX(ix-2)]);
+            int iz=nz-1;
+            sumx = coef[0] * (in[0][IXYZ(ix+1,ny-1-iy,iz)]-in[0][IXYZ(ix-1,ny-1-iy,iz)]) + coef[1] * (in[0][IXYZ(ix+2,ny-1-iy,iz)]-in[0][IXYZ(ix-2,ny-1-iy,iz)]);
             sumy=0;
             for (int j=0; j<nc2; j++){
                 sumy -= bnd_coef[iy*nc2+j] * in[1][IY(ny-1-j)];
@@ -682,7 +682,7 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
         for (int ix=ixminb; ix<ixmaxb; ix++){
 
             // (Dx.in1)_0 and (Dy.in2)_0
-            int iz=0;
+            int iz=nz-1;
             sumx = coef[0] * (in[0][IX(ix+1)]-in[0][IX(ix-1)]) + coef[1] * (in[0][IX(ix+2)]-in[0][IX(ix-2)]);
             sumy = coef[0] * (in[1][IY(iy+1)]-in[1][IY(iy-1)]) + coef[1] * (in[1][IY(iy+2)]-in[1][IY(iy-2)]);
 
@@ -751,7 +751,7 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             sumz=0;
             for (int j=0; j<nc2; j++){
                 sumy -= bnd_coef[iy*nc2+j] * in[0][IY(ny-1-j)];
-                sumz += bnd_coef[iz*nc2+j] * in[1][IZ(j)];
+                sumz += bnd_coef[iz*nc2+j] * in[1][IXYZ(ix,ny-1-iy,j)];
             }
 
             // (Sx.in3)_0
@@ -797,7 +797,7 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             sumy=0;
             sumz=0;
             for (int j=0; j<nc2; j++){
-                sumy += bnd_coef[iy*nc2+j] * in[0][IY(j)];
+                sumy += bnd_coef[iy*nc2+j] * in[0][IXYZ(ix,j,nz-1-iz)];
                 sumz -= bnd_coef[iz*nc2+j] * in[1][IZ(nz-1-j)];
             }
 
@@ -821,8 +821,8 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             sumy=0;
             sumz=0;
             for (int j=0; j<nc2; j++){
-                sumy -= bnd_coef[iy*nc2+j] * in[0][IY(ny-1-j)];
-                sumz -= bnd_coef[iz*nc2+j] * in[1][IZ(nz-1-j)];
+                sumy -= bnd_coef[iy*nc2+j] * in[0][IXYZ(ix,ny-1-j,nz-1-iz)];
+                sumz -= bnd_coef[iz*nc2+j] * in[1][IXYZ(ix,ny-1-iy,nz-1-j)];
             }
 
             // (Sx.in3)_0
@@ -842,7 +842,7 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
 
             // (Dy.in1)_0 and (Dz.in2)_0
             int ix=0;
-            sumy = coef[0] * (in[0][IY(iy+1)]-in[0][IY(iy-1)]) + coef[1] * (in[0][IY(iy+2)]-in[0][IY(iy-2)]);
+            sumy = coef[0] * (in[0][IXYZ(ix,iy+1,nz-1-iz)]-in[0][IXYZ(ix,iy-1,nz-1-iz)]) + coef[1] * (in[0][IXYZ(ix,iy+2,nz-1-iz)]-in[0][IXYZ(ix,iy-2,nz-1-iz)]);
             sumz=0;
             for (int j=0; j<nc2; j++){
                 sumz -= bnd_coef[iz*nc2+j] * in[1][IZ(nz-1-j)];
@@ -892,7 +892,7 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             for (int j=0; j<nc2; j++){
                 sumy -= bnd_coef[iy*nc2+j] * in[0][IY(ny-1-j)];
             }
-            sumz = coef[0] * (in[1][IZ(iz+1)]-in[1][IZ(iz-1)]) + coef[1] * (in[1][IZ(iz+2)]-in[1][IZ(iz-2)]);
+            sumz = coef[0] * (in[1][IXYZ(ix,ny-1-iy,iz+1)]-in[1][IXYZ(ix,ny-1-iy,iz-1)]) + coef[1] * (in[1][IXYZ(ix,ny-1-iy,iz+2)]-in[1][IXYZ(ix,ny-1-iy,iz-2)]);
 
             // (Sx.in3)_0
             sumx = 0;
@@ -979,7 +979,7 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             sumz=0;
             for (int j=0; j<nc2; j++){
                 sumy -= bnd_coef[iy*nc2+j] * in[0][IY(ny-1-j)];
-                sumz += bnd_coef[iz*nc2+j] * in[1][IZ(j)];
+                sumz += bnd_coef[iz*nc2+j] * in[1][IXYZ(ix,ny-1-iy,j)];
             }
 
             // (Sx.in3)_0
@@ -1025,7 +1025,7 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             sumy=0;
             sumz=0;
             for (int j=0; j<nc2; j++){
-                sumy += bnd_coef[iy*nc2+j] * in[0][IY(j)];
+                sumy += bnd_coef[iy*nc2+j] * in[0][IXYZ(ix,j,nz-1-iz)];
                 sumz -= bnd_coef[iz*nc2+j] * in[1][IZ(nz-1-j)];
             }
 
@@ -1049,8 +1049,8 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             sumy=0;
             sumz=0;
             for (int j=0; j<nc2; j++){
-                sumy -= bnd_coef[iy*nc2+j] * in[0][IY(ny-1-j)];
-                sumz -= bnd_coef[iz*nc2+j] * in[1][IZ(nz-1-j)];
+                sumy -= bnd_coef[iy*nc2+j] * in[0][IXYZ(ix,ny-1-j,nz-1-iz)];
+                sumz -= bnd_coef[iz*nc2+j] * in[1][IXYZ(ix,ny-1-iy,nz-1-j)];
             }
 
             // (Sx.in3)_0
@@ -1070,7 +1070,7 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
 
             // (Dy.in1)_0 and (Dz.in2)_0
             int ix=nx-1;
-            sumy = coef[0] * (in[0][IY(iy+1)]-in[0][IY(iy-1)]) + coef[1] * (in[0][IY(iy+2)]-in[0][IY(iy-2)]);
+            sumy = coef[0] * (in[0][IXYZ(ix,iy+1,nz-1-iz)]-in[0][IXYZ(ix,iy-1,nz-1-iz)]) + coef[1] * (in[0][IXYZ(ix,iy+2,nz-1-iz)]-in[0][IXYZ(ix,iy-2,nz-1-iz)]);
             sumz=0;
             for (int j=0; j<nc2; j++){
                 sumz -= bnd_coef[iz*nc2+j] * in[1][IZ(nz-1-j)];
@@ -1120,7 +1120,7 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             for (int j=0; j<nc2; j++){
                 sumy -= bnd_coef[iy*nc2+j] * in[0][IY(ny-1-j)];
             }
-            sumz = coef[0] * (in[1][IZ(iz+1)]-in[1][IZ(iz-1)]) + coef[1] * (in[1][IZ(iz+2)]-in[1][IZ(iz-2)]);
+            sumz = coef[0] * (in[1][IXYZ(ix,ny-1-iy,iz+1)]-in[1][IXYZ(ix,ny-1-iy,iz-1)]) + coef[1] * (in[1][IXYZ(ix,ny-1-iy,iz+2)]-in[1][IXYZ(ix,ny-1-iy,iz-2)]);
 
             // (Sx.in3)_0
             sumx = 0;
@@ -1164,7 +1164,7 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
     int ixminb=std::max(nc1,ixmin);
     int ixmaxb=std::min(nx - nc1, ixmax);
     int izminb=std::max(nc1,izmin);
-    int izmaxb=std::min(ny - nc1, izmax);
+    int izmaxb=std::min(nz - nc1, izmax);
     data_t adh = 1.0/(dy*h0);
 
     data_t sumx, sumy, sumz;
@@ -1206,7 +1206,7 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             sumx=0;
             sumz=0;
             for (int j=0; j<nc2; j++){
-                sumx += bnd_coef[ix*nc2+j] * in[0][IX(j)];
+                sumx += bnd_coef[ix*nc2+j] * in[0][IXYZ(j,iy,nz-1-iz)];
                 sumz -= bnd_coef[iz*nc2+j] * in[1][IZ(nz-1-j)];
             }
 
@@ -1254,7 +1254,7 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             sumz=0;
             for (int j=0; j<nc2; j++){
                 sumx -= bnd_coef[ix*nc2+j] * in[0][IX(nx-1-j)];
-                sumz += bnd_coef[iz*nc2+j] * in[1][IZ(j)];
+                sumz += bnd_coef[iz*nc2+j] * in[1][IXYZ(nx-1-ix,iy,j)];
             }
 
             // (Sy.in3)_0
@@ -1277,8 +1277,8 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             sumx=0;
             sumz=0;
             for (int j=0; j<nc2; j++){
-                sumx -= bnd_coef[ix*nc2+j] * in[0][IX(nx-1-j)];
-                sumz -= bnd_coef[iz*nc2+j] * in[1][IZ(nz-1-j)];
+                sumx -= bnd_coef[ix*nc2+j] * in[0][IXYZ(nx-1-j,iy,nz-1-iz)];
+                sumz -= bnd_coef[iz*nc2+j] * in[1][IXYZ(nx-1-ix,iy,nz-1-j)];
             }
 
             // (Sy.in3)_0
@@ -1302,7 +1302,7 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             for (int j=0; j<nc2; j++){
                 sumx -= bnd_coef[ix*nc2+j] * in[0][IX(nx-1-j)];
             }
-            sumz = coef[0] * (in[1][IZ(iz+1)]-in[1][IZ(iz-1)]) + coef[1] * (in[1][IZ(iz+2)]-in[1][IZ(iz-2)]);
+            sumz = coef[0] * (in[1][IXYZ(nx-1-ix,iy,iz+1)]-in[1][IXYZ(nx-1-ix,iy,iz-1)]) + coef[1] * (in[1][IXYZ(nx-1-ix,iy,iz+2)]-in[1][IXYZ(nx-1-ix,iy,iz-2)]);
 
             // (Sy.in3)_0
             sumy = 0;
@@ -1344,7 +1344,7 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
 
             // (Dx.in1)_0 and (Dz.in2)_0
             int iy=0;
-            sumx = coef[0] * (in[0][IX(ix+1)]-in[0][IX(ix-1)]) + coef[1] * (in[0][IX(ix+2)]-in[0][IX(ix-2)]);
+            sumx = coef[0] * (in[0][IXYZ(ix+1,iy,nz-1-iz)]-in[0][IXYZ(ix-1,iy,nz-1-iz)]) + coef[1] * (in[0][IXYZ(ix+2,iy,nz-1-iz)]-in[0][IXYZ(ix-2,iy,nz-1-iz)]);
             sumz=0;
             for (int j=0; j<nc2; j++){
                 sumz -= bnd_coef[iz*nc2+j] * in[1][IZ(nz-1-j)];
@@ -1434,7 +1434,7 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             sumx=0;
             sumz=0;
             for (int j=0; j<nc2; j++){
-                sumx += bnd_coef[ix*nc2+j] * in[0][IX(j)];
+                sumx += bnd_coef[ix*nc2+j] * in[0][IXYZ(j,iy,nz-1-iz)];
                 sumz -= bnd_coef[iz*nc2+j] * in[1][IZ(nz-1-j)];
             }
 
@@ -1482,7 +1482,7 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             sumz=0;
             for (int j=0; j<nc2; j++){
                 sumx -= bnd_coef[ix*nc2+j] * in[0][IX(nx-1-j)];
-                sumz += bnd_coef[iz*nc2+j] * in[1][IZ(j)];
+                sumz += bnd_coef[iz*nc2+j] * in[1][IXYZ(nx-1-ix,iy,j)];
             }
 
             // (Sy.in3)_0
@@ -1505,8 +1505,8 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             sumx=0;
             sumz=0;
             for (int j=0; j<nc2; j++){
-                sumx -= bnd_coef[ix*nc2+j] * in[0][IX(nx-1-j)];
-                sumz -= bnd_coef[iz*nc2+j] * in[1][IZ(nz-1-j)];
+                sumx -= bnd_coef[ix*nc2+j] * in[0][IXYZ(nx-1-j,iy,nz-1-iz)];
+                sumz -= bnd_coef[iz*nc2+j] * in[1][IXYZ(nx-1-ix,iy,nz-1-j)];
             }
 
             // (Sy.in3)_0
@@ -1530,7 +1530,7 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             for (int j=0; j<nc2; j++){
                 sumx -= bnd_coef[ix*nc2+j] * in[0][IX(nx-1-j)];
             }
-            sumz = coef[0] * (in[1][IZ(iz+1)]-in[1][IZ(iz-1)]) + coef[1] * (in[1][IZ(iz+2)]-in[1][IZ(iz-2)]);
+            sumz = coef[0] * (in[1][IXYZ(nx-1-ix,iy,iz+1)]-in[1][IXYZ(nx-1-ix,iy,iz-1)]) + coef[1] * (in[1][IXYZ(nx-1-ix,iy,iz+2)]-in[1][IXYZ(nx-1-ix,iy,iz-2)]);
 
             // (Sy.in3)_0
             sumy = 0;
@@ -1572,7 +1572,7 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
 
             // (Dx.in1)_0 and (Dz.in2)_0
             int iy=ny-1;
-            sumx = coef[0] * (in[0][IX(ix+1)]-in[0][IX(ix-1)]) + coef[1] * (in[0][IX(ix+2)]-in[0][IX(ix-2)]);
+            sumx = coef[0] * (in[0][IXYZ(ix+1,iy,nz-1-iz)]-in[0][IXYZ(ix-1,iy,nz-1-iz)]) + coef[1] * (in[0][IXYZ(ix+2,iy,nz-1-iz)]-in[0][IXYZ(ix-2,iy,nz-1-iz)]);
             sumz=0;
             for (int j=0; j<nc2; j++){
                 sumz -= bnd_coef[iz*nc2+j] * in[1][IZ(nz-1-j)];

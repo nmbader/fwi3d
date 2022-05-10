@@ -29,34 +29,21 @@ void sepWrite(const std::shared_ptr<vecReg<T> > vec, std::string output){
         df = (float)axes[i].d;
 
         if (output == "out"){
+            putch((char*)esize.c_str(),(char*)"d",(int*)&size);
             putch((char*)ni.c_str(),(char*)"d",(int*)&axes[i].n);
             putch((char*)oi.c_str(),(char*)"f",(void*)&of);
             putch((char*)di.c_str(),(char*)"f",(void*)&df);
             putch((char*)labeli.c_str(),(char*)"s",(void*)axes[i].label.c_str());
         }
         else{
+            auxputch(esize.c_str(),"d",&size,out);
             auxputch(ni.c_str(),"d",&axes[i].n,out);
             auxputch(oi.c_str(),"f",&of,out);
             auxputch(di.c_str(),"f",&df,out);
             auxputch(labeli.c_str(),"s",axes[i].label.c_str(),out);
         }
     }
-
-    if (output == "out") putch((char*)esize.c_str(),(char*)"d",(int*)&size);
-    else auxputch(esize.c_str(),"d",&size,out);
-
-    if (sizeof(T)==4){
-        successCheck(4*n123 == srite_big(out,vec->getVals(),4*n123), "Cannot write data\n");
-    }
-    else if (sizeof(T)==8){
-        float* val = new float[n123];
-        for (int i=0; i<n123; i++) val[i] = vec->getVals()[i];
-        successCheck(4*n123 == srite_big(out,val,4*n123), "Cannot write data\n");
-        delete val;
-    }
-    else{
-        successCheck(false, "Cannot write the current template vector.\n");
-    }
+    successCheck(size*n123 == srite_big(out,vec->getVals(),size*n123), "Cannot write data\n");
 }
 
 
@@ -64,12 +51,13 @@ void sepWrite(const std::shared_ptr<vecReg<T> > vec, std::string output){
 template <typename T>
 std::shared_ptr<vecReg<T> > sepRead(std::string input, int ndim0=1){
     
-    int n1=1, n2=1, n3=1, n4=1, n5=1, n6=1;
+    int n1=1, n2=1, n3=1, n4=1, n5=1, n6=1, size=4;
 	float o1=0, o2=0, o3=0, o4=0, o5=0, o6=0, d1=1, d2=1, d3=1, d4=1, d5=1, d6=1;
 	char label1[20]={""}, label2[20]={""}, label3[20]={""}, label4[20]={""}, label5[20]={""}, label6[20]={""};
     const char* data = input.c_str();
 
     if (input == "in"){
+        hetch((char*)"esize",(char*)"d",&size);
         hetch((char*)"n1",(char*)"d",&n1);
         hetch((char*)"n2",(char*)"d",&n2);
         hetch((char*)"n3",(char*)"d",&n3);
@@ -96,6 +84,7 @@ std::shared_ptr<vecReg<T> > sepRead(std::string input, int ndim0=1){
         hetch((char*)"label6",(char*)"s",&label6);
     }
     else{
+        auxpar((char*)"esize",(char*)"d",&size,data);
         auxpar((char*)"n1",(char*)"d",&n1,data);
         auxpar((char*)"n2",(char*)"d",&n2,data);
         auxpar((char*)"n3",(char*)"d",&n3,data);
@@ -164,19 +153,24 @@ std::shared_ptr<vecReg<T> > sepRead(std::string input, int ndim0=1){
     hypercube<T> hyper(axes);
     std::shared_ptr<vecReg<T> > vec = std::make_shared<vecReg<T> > (hyper);
 
-    if (sizeof(T)==4){
-        successCheck(4*n123 == sreed(data,vec->getVals(),4*n123), "Cannot read data\n");
+    if (sizeof(T)==size){
+        successCheck(size*n123 == sreed(data,vec->getVals(),size*n123), "Cannot read data\n");
     }
-    else if (sizeof(T)==8){
-        float* val = new float[n123];
-        successCheck(4*n123 == sreed(data,val,4*n123), "Cannot read data\n");
-        for (int i=0; i<n123; i++) vec->getVals()[i]=val[i];
-        delete val;
+    else {
+        if (size==4){
+            float* val = new float[n123];
+            successCheck(size*n123 == sreed(data,val,size*n123), "Cannot read data\n");
+            for (long i=0; i<n123; i++) vec->getVals()[i]=val[i];
+            delete [] val;
+        }
+        else if (size==8){
+            double* val = new double[n123];
+            successCheck(size*n123 == sreed(data,val,size*n123), "Cannot read data\n");
+            for (long i=0; i<n123; i++) vec->getVals()[i]=val[i];
+            delete [] val;
+        }
+        else successCheck(false,"Cannot read into the current template vector.\n");
     }
-	else{
-        successCheck(false, "Cannot read into the current template vector.\n");
-    }
-
     return vec;
 }
 
@@ -353,6 +347,7 @@ std::shared_ptr<vecReg<T> > binRead(std::string input, int ndim0=1){
                 }
                 else if (word.substr(0, 3) == "in=") {
                     word.erase(0, 3);
+                    if (word.at(0)=='"') {word.erase(0,1); word.pop_back();}
                     in=word;
                 }
             }
@@ -398,7 +393,7 @@ std::shared_ptr<vecReg<T> > binRead(std::string input, int ndim0=1){
     T * pdata = vec->getVals();
 
     FILE * pFile;
-    pFile = fopen (in.c_str(), "rb");
+    pFile = fopen(in.c_str(), "rb");
     msg = "The input file "+in+" could not be read. Check the path or the file name\n";
     successCheck(pFile!=NULL,msg.c_str());
 
@@ -408,9 +403,25 @@ std::shared_ptr<vecReg<T> > binRead(std::string input, int ndim0=1){
     rewind (pFile);
 
     msg = "The binary file contains "+std::to_string(lSize)+" bytes whereas the description file suggests "+std::to_string(n123*esize)+" bytes\n";
-    successCheck(lSize==n123*sizeof(T),msg.c_str());
+    successCheck(lSize==n123*esize,msg.c_str());
 
-    long result = fread(pdata, sizeof(T), n123, pFile);
+    long result;
+    if (sizeof(T)==esize) result = fread(pdata, esize, n123, pFile);
+    else{
+        if (esize==4){
+            float* val = new float[n123];
+            result = fread(val, esize, n123, pFile);
+            for (long i=0; i<n123; i++) pdata[i]=val[i];
+            delete [] val;
+        }
+        else if (esize==8){
+            double* val = new double[n123];
+            result = fread(val, esize, n123, pFile);
+            for (long i=0; i<n123; i++) pdata[i]=val[i];
+            delete [] val;
+        }
+        else successCheck(false,"Cannot read into the current template vector.\n");
+    }
 
     msg = "The binary file was not read properly. It may be that the requested data type and esize are inconsistent\n";
     successCheck(result==n123,msg.c_str());

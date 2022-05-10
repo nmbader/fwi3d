@@ -38,8 +38,8 @@ void analyzeGeometry(const hypercube<data_t> &model, param &par, bool verbose)
     par.bc_bottom = std::max(0, par.bc_bottom);
     par.bc_left = std::max(0, par.bc_left);
     par.bc_right = std::max(0, par.bc_right);
-    par.bc_front = std::max(0, par.bc_left);
-    par.bc_back = std::max(0, par.bc_right);
+    par.bc_front = std::max(0, par.bc_front);
+    par.bc_back = std::max(0, par.bc_back);
     std::string bc[6] = {"none","free surface","locally absorbing","rigid-wall","mixed rigid-absorbing","mixed rigid-free"};
     if (verbose){
         fprintf(stderr,"Top boundary condition = %s\t taper size = %d\n",bc[par.bc_top].c_str(), par.taper_top); 
@@ -488,9 +488,9 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
     if (adj) {nscomp = par.nrcomp; nrcomp=par.nscomp;}
 
     // prev = 1/(2 * rho) * dt2 * src
-    inj->inject(false, src, prev[0], nx, ny, nz, par.nt, nscomp, 0, 0, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
-    inj->inject(false, src, prev[1], nx, ny, nz, par.nt, nscomp, 1, 0, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
-    inj->inject(false, src, prev[2], nx, ny, nz, par.nt, nscomp, 2, 0, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
+    inj->inject(false, src, prev[0], nx, ny, nz, par.nt, inj->_npts, 0, 0, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
+    inj->inject(false, src, prev[1], nx, ny, nz, par.nt, inj->_npts, 1, 0, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
+    inj->inject(false, src, prev[2], nx, ny, nz, par.nt, inj->_npts, 2, 0, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
     for (int i=0; i<nxyz; i++)
     {
         prev[0][i]  *= 0.5 * par.dt*par.dt/ mod[2][i];
@@ -508,9 +508,9 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
         // extract receivers
         if (grad == nullptr)
         {
-            ext->extract(true, curr[0], rcv, nx, ny, nz, par.nt, nrcomp, 0, it, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
-            ext->extract(true, curr[1], rcv, nx, ny, nz, par.nt, nrcomp, 1, it, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
-            ext->extract(true, curr[2], rcv, nx, ny, nz, par.nt, nrcomp, 2, it, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
+            ext->extract(true, curr[0], rcv, nx, ny, nz, par.nt, ext->_npts, 0, it, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
+            ext->extract(true, curr[1], rcv, nx, ny, nz, par.nt, ext->_npts, 1, it, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
+            ext->extract(true, curr[2], rcv, nx, ny, nz, par.nt, ext->_npts, 2, it, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
         }
 
         // compute FWI gradients except for first and last time samples
@@ -561,19 +561,19 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
         mult_Dy(true, u_z[1], next[2], nx, ny, nz, dy, 0, nx, 0, ny, 0, nz, mod[1]);
 
         // inject sources
-        inj->inject(true, src, next[0], nx, ny, nz, par.nt, nscomp, 0, it, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
-        inj->inject(true, src, next[1], nx, ny, nz, par.nt, nscomp, 1, it, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
-        inj->inject(true, src, next[2], nx, ny, nz, par.nt, nscomp, 2, it, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
+        inj->inject(true, src, next[0], nx, ny, nz, par.nt, inj->_npts, 0, it, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
+        inj->inject(true, src, next[1], nx, ny, nz, par.nt, inj->_npts, 1, it, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
+        inj->inject(true, src, next[2], nx, ny, nz, par.nt, inj->_npts, 2, it, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
 
         // apply boundary conditions
         if (par.bc_top==1)
         {
             const data_t * in[3] = {curr[2],curr[1],curr[0]};
             esat_neumann_top<mu,zero,mu>(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
-            in[0] = curr[1]; in[1] = curr[0];
+            in[2] = curr[1]; in[1] = curr[2];
             esat_neumann_top<zero,mu,mu>(true, in, next[1], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
             in[0] = curr[0]; in[1] = curr[1]; in[2] = curr[2];
-            esat_neumann_top<mu,mu,mu>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
+            esat_neumann_top<lam,lam,mu2>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
             esat_Dz_top(true, curr[2], next[2], nx, ny, nz, dz, 0, nx, 0, ny, mod[0]);
         }
         else if (par.bc_top==2)
@@ -588,10 +588,10 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
         {
             const data_t * in[3] = {curr[2],curr[1],curr[0]};
             esat_neumann_bottom<mu,zero,mu>(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
-            in[0] = curr[1]; in[1] = curr[0];
+            in[2] = curr[1]; in[1] = curr[2];
             esat_neumann_bottom<zero,mu,mu>(true, in, next[1], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
             in[0] = curr[0]; in[1] = curr[1]; in[2] = curr[2];
-            esat_neumann_bottom<mu,mu,mu>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
+            esat_neumann_bottom<lam,lam,mu2>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
             esat_Dz_bottom(true, curr[2], next[2], nx, ny, nz, dz, 0, nx, 0, ny, mod[0]);
         }
         else if (par.bc_bottom==2)
@@ -605,7 +605,7 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
             in[2] = curr[2]; in[1] = curr[0];
             esat_neumann_left<zero,mu,mu>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod);
             in[0] = curr[1]; in[1] = curr[2]; in[2] = curr[0];
-            esat_neumann_left<mu,mu,mu>(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod);
+            esat_neumann_left<lam,lam,mu2>(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod);
             esat_Dx_left(true, curr[0], next[0], nx, ny, nz, dx, 0, ny, 0, nz, mod[0]);
         }
         else if (par.bc_left==2)
@@ -619,7 +619,7 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
             in[2] = curr[2]; in[1] = curr[0];
             esat_neumann_right<zero,mu,mu>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod);
             in[0] = curr[1]; in[1] = curr[2]; in[2] = curr[0];
-            esat_neumann_right<mu,mu,mu>(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod);
+            esat_neumann_right<lam,lam,mu2>(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod);
             esat_Dx_right(true, curr[0], next[0], nx, ny, nz, dx, 0, ny, 0, nz, mod[0]);
         }
         else if (par.bc_right==2)
@@ -633,7 +633,7 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
             in[2] = curr[2]; in[1] = curr[1];
             esat_neumann_front<zero,mu,mu>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod);
             in[0] = curr[0]; in[1] = curr[2]; in[2] = curr[1];
-            esat_neumann_front<mu,mu,mu>(true, in, next[1], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod);
+            esat_neumann_front<lam,lam,mu2>(true, in, next[1], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod);
             esat_Dy_front(true, curr[1], next[1], nx, ny, nz, dy, 0, nx, 0, nz, mod[0]);
         }
         else if (par.bc_front==2)
@@ -647,7 +647,7 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
             in[2] = curr[2]; in[1] = curr[1];
             esat_neumann_back<zero,mu,mu>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod);
             in[0] = curr[0]; in[1] = curr[2]; in[2] = curr[1];
-            esat_neumann_back<mu,mu,mu>(true, in, next[1], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod);
+            esat_neumann_back<lam,lam,mu2>(true, in, next[1], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod);
             esat_Dy_back(true, curr[1], next[1], nx, ny, nz, dy, 0, nx, 0, nz, mod[0]);
         }
         else if (par.bc_back==2)
@@ -700,9 +700,9 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
     // extract receivers last sample
     if (grad == nullptr)
     {
-        ext->extract(true, curr[0], rcv, nx, ny, nz, par.nt, nrcomp, 0, par.nt-1, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
-        ext->extract(true, curr[1], rcv, nx, ny, nz, par.nt, nrcomp, 1, par.nt-1, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
-        ext->extract(true, curr[2], rcv, nx, ny, nz, par.nt, nrcomp, 2, par.nt-1, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
+        ext->extract(true, curr[0], rcv, nx, ny, nz, par.nt, ext->_npts, 0, par.nt-1, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
+        ext->extract(true, curr[1], rcv, nx, ny, nz, par.nt, ext->_npts, 1, par.nt-1, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
+        ext->extract(true, curr[2], rcv, nx, ny, nz, par.nt, ext->_npts, 2, par.nt-1, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
     }
 
     // last sample gradient

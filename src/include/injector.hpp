@@ -78,8 +78,10 @@ public:
         int npts=loc.size();
         _npts = npts;
         _xind.resize(3*npts, 0);
+        _yind.resize(3*npts, 0);
         _zind.resize(3*npts, 0);
         _xw.resize(12*npts, 0.0);
+        _yw.resize(12*npts, 0.0);
         _zw.resize(12*npts, 0.0);
         findIndicesWeights(range, loc);
     }
@@ -108,8 +110,10 @@ public:
         int npts=loc.size();
         _npts = npts;
         _xind.resize(6*npts, 0);
+        _yind.resize(6*npts, 0);
         _zind.resize(6*npts, 0);
         _xw.resize(12*npts, 0.0);
+        _yw.resize(12*npts, 0.0);
         _zw.resize(12*npts, 0.0);
         findIndicesWeights(range, loc, gl);
     }
