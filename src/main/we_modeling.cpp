@@ -1,14 +1,7 @@
-#ifdef DOUBLE_PRECISION
-    typedef double data_t;
-#else
-    typedef float data_t;
-#endif
-
 #include <string.h>
 #include "we_op.hpp"
 #include "IO.hpp"
 #include "seplib.h"
-
 
 typedef vecReg<data_t> vec;
 typedef cvecReg<data_t> cvec;

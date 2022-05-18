@@ -428,7 +428,7 @@ void nl_we_op_e::convert_model(data_t * m, int n, bool forward) const
     }
 }
 
-// variable coefficients expressions for 2nd derivative SBP operators
+// variable coefficients expressions for 2nd derivative SBP and SAT operators
 static inline data_t zero(const data_t ** par, int i){return 0;} // e.g. = zero function
 static inline data_t lam(const data_t ** par, int i){return par[0][i];} // e.g. = lambda
 static inline data_t mu(const data_t ** par, int i){return par[1][i];} // e.g. = mu
@@ -437,8 +437,8 @@ static inline data_t c13(const data_t ** par, int i){return par[3][i];} // e.g. 
 static inline data_t eps(const data_t ** par, int i){return par[4][i];} // e.g. = eps
 static inline data_t gamma(const data_t ** par, int i){return par[5][i];} // e.g. = gamma
 static inline data_t mu2(const data_t ** par, int i){return 2*par[1][i];} // e.g. = 2 mu
-static inline data_t sq_rho_mu(const data_t ** par, int i){return 0.5*sqrt(par[1][i]*par[2][i]);} // e.g. = 1/2 sqrt(rho.mu)
-static inline data_t sq_rho_l2mu(const data_t ** par, int i){return 0.5*sqrt((par[0][i]+2*par[1][i])*par[2][i]);} // e.g. = 1/2 sqrt(rho.(lambda+2 mu))
+static inline data_t simp(const data_t ** par, int i){return 0.5*sqrt(par[1][i]*par[2][i]);} // e.g. = 1/2 sqrt(rho.mu)
+static inline data_t pimp(const data_t ** par, int i){return 0.5*sqrt((par[0][i]+2*par[1][i])*par[2][i]);} // e.g. = 1/2 sqrt(rho.(lambda+2 mu))
 
 void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, const data_t * curr, const data_t * u_x,  const data_t * u_y, const data_t * u_z, data_t * tmp, data_t * grad, const param &par, int nx, int ny, int nz, int it, data_t dx, data_t dy, data_t dz, data_t dt) const
 {
@@ -481,6 +481,7 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
         memset(tmp, 0, nxyz*sizeof(data_t));
     }
 	const data_t* mod[3] = {model, model+nxyz, model+2*nxyz};
+    
     
     // source and receiver components for injection/extraction
     int nscomp = par.nscomp;
@@ -565,94 +566,121 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
         inj->inject(true, src, next[1], nx, ny, nz, par.nt, inj->_npts, 1, it, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
         inj->inject(true, src, next[2], nx, ny, nz, par.nt, inj->_npts, 2, it, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
 
+
         // apply boundary conditions
         if (par.bc_top==1)
         {
-            const data_t * in[3] = {curr[2],curr[1],curr[0]};
-            esat_neumann_top<mu,zero,mu>(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
+            const data_t * in[4] = {curr[2],curr[1],curr[0],prev[0]};
+            esat_neumann_top<mu,zero,zero,mu,zero>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
             in[2] = curr[1]; in[1] = curr[2];
-            esat_neumann_top<zero,mu,mu>(true, in, next[1], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
+            esat_neumann_top<zero,mu,zero,mu,zero>(true, in, next[1], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
             in[0] = curr[0]; in[1] = curr[1]; in[2] = curr[2];
-            esat_neumann_top<lam,lam,mu2>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
-            esat_Dz_top(true, curr[2], next[2], nx, ny, nz, dz, 0, nx, 0, ny, mod[0]);
+            esat_neumann_top<lam,lam,lam,mu2,zero>(true, in, next[2], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
+            //esat_Dz_top(true, curr[2], next[2], nx, ny, nz, dz, 0, nx, 0, ny, mod[0]);
         }
         else if (par.bc_top==2)
         {
-            //const data_t * in[3] = {curr[1],curr[0],prev[0]};
-            //esat_absorbing_top<expr2,expr2,expr5>(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
-            //in[0] = curr[0]; in[1] = curr[1]; in[2] = prev[1];
-            //esat_absorbing_top<expr1,expr4b,expr6>(true, in, next[1], nx, nz, dx, dz, par.dt, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
-            //esat_Dz_top<expr1>(true, curr[1], next[1], nx, nz, dz, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
+            const data_t * in[4] = {curr[2],curr[1],curr[0],prev[0]};
+            esat_neumann_top<mu,zero,zero,mu,simp>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
+            in[2] = curr[1]; in[1] = curr[2]; in[3]=prev[1];
+            esat_neumann_top<zero,mu,zero,mu,simp>(true, in, next[1], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
+            in[0] = curr[0]; in[1] = curr[1]; in[2] = curr[2]; in[3]=prev[2];
+            esat_neumann_top<lam,lam,lam,mu2,pimp>(true, in, next[2], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
         }
         if (par.bc_bottom==1)
         {
-            const data_t * in[3] = {curr[2],curr[1],curr[0]};
-            esat_neumann_bottom<mu,zero,mu>(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
+            const data_t * in[4] = {curr[2],curr[1],curr[0],prev[0]};
+            esat_neumann_bottom<mu,zero,zero,mu,zero>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
             in[2] = curr[1]; in[1] = curr[2];
-            esat_neumann_bottom<zero,mu,mu>(true, in, next[1], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
+            esat_neumann_bottom<zero,mu,zero,mu,zero>(true, in, next[1], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
             in[0] = curr[0]; in[1] = curr[1]; in[2] = curr[2];
-            esat_neumann_bottom<lam,lam,mu2>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod);
-            esat_Dz_bottom(true, curr[2], next[2], nx, ny, nz, dz, 0, nx, 0, ny, mod[0]);
+            esat_neumann_bottom<lam,lam,lam,mu2,zero>(true, in, next[2], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
+            //esat_Dz_bottom(true, curr[2], next[2], nx, ny, nz, dz, 0, nx, 0, ny, mod[0]);
         }
         else if (par.bc_bottom==2)
         {
-            
+            const data_t * in[4] = {curr[2],curr[1],curr[0],prev[0]};
+            esat_neumann_bottom<mu,zero,zero,mu,simp>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
+            in[2] = curr[1]; in[1] = curr[2]; in[3]=prev[1];
+            esat_neumann_bottom<zero,mu,zero,mu,simp>(true, in, next[1], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
+            in[0] = curr[0]; in[1] = curr[1]; in[2] = curr[2]; in[3]=prev[2];
+            esat_neumann_bottom<lam,lam,lam,mu2,pimp>(true, in, next[2], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
         }
         if (par.bc_left==1)
         {
-            const data_t * in[3] = {curr[0],curr[2],curr[1]};
-            esat_neumann_left<mu,zero,mu>(true, in, next[1], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod);
+            const data_t * in[4] = {curr[0],curr[2],curr[1],prev[0]};
+            esat_neumann_left<mu,zero,zero,mu,zero>(true, in, next[1], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
             in[2] = curr[2]; in[1] = curr[0];
-            esat_neumann_left<zero,mu,mu>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod);
+            esat_neumann_left<zero,mu,zero,mu,zero>(true, in, next[2], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
             in[0] = curr[1]; in[1] = curr[2]; in[2] = curr[0];
-            esat_neumann_left<lam,lam,mu2>(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod);
-            esat_Dx_left(true, curr[0], next[0], nx, ny, nz, dx, 0, ny, 0, nz, mod[0]);
+            esat_neumann_left<lam,lam,lam,mu2,zero>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
+            //esat_Dx_left(true, curr[0], next[0], nx, ny, nz, dx, 0, ny, 0, nz, mod[0]);
         }
         else if (par.bc_left==2)
         {
-            
+            const data_t * in[4] = {curr[0],curr[2],curr[1],prev[1]};
+            esat_neumann_left<mu,zero,zero,mu,simp>(true, in, next[1], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
+            in[2] = curr[2]; in[1] = curr[0]; in[3]=prev[2];
+            esat_neumann_left<zero,mu,zero,mu,simp>(true, in, next[2], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
+            in[0] = curr[1]; in[1] = curr[2]; in[2] = curr[0]; in[3]=prev[0];
+            esat_neumann_left<lam,lam,lam,mu2,pimp>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
         }
         if (par.bc_right==1)
         {
-            const data_t * in[3] = {curr[0],curr[2],curr[1]};
-            esat_neumann_right<mu,zero,mu>(true, in, next[1], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod);
+            const data_t * in[4] = {curr[0],curr[2],curr[1],prev[0]};
+            esat_neumann_right<mu,zero,zero,mu,zero>(true, in, next[1], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
             in[2] = curr[2]; in[1] = curr[0];
-            esat_neumann_right<zero,mu,mu>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod);
+            esat_neumann_right<zero,mu,zero,mu,zero>(true, in, next[2], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
             in[0] = curr[1]; in[1] = curr[2]; in[2] = curr[0];
-            esat_neumann_right<lam,lam,mu2>(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod);
-            esat_Dx_right(true, curr[0], next[0], nx, ny, nz, dx, 0, ny, 0, nz, mod[0]);
+            esat_neumann_right<lam,lam,lam,mu2,zero>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
+            //esat_Dx_right(true, curr[0], next[0], nx, ny, nz, dx, 0, ny, 0, nz, mod[0]);
         }
         else if (par.bc_right==2)
         {
-            
+            const data_t * in[4] = {curr[0],curr[2],curr[1],prev[1]};
+            esat_neumann_right<mu,zero,zero,mu,simp>(true, in, next[1], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
+            in[2] = curr[2]; in[1] = curr[0]; in[3]=prev[2];
+            esat_neumann_right<zero,mu,zero,mu,simp>(true, in, next[2], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
+            in[0] = curr[1]; in[1] = curr[2]; in[2] = curr[0]; in[3]=prev[0];
+            esat_neumann_right<lam,lam,lam,mu2,pimp>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
         }
         if (par.bc_front==1)
         {
-            const data_t * in[3] = {curr[1],curr[2],curr[0]};
-            esat_neumann_front<mu,zero,mu>(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod);
+            const data_t * in[4] = {curr[1],curr[2],curr[0],prev[0]};
+            esat_neumann_front<mu,zero,zero,mu,zero>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
             in[2] = curr[2]; in[1] = curr[1];
-            esat_neumann_front<zero,mu,mu>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod);
+            esat_neumann_front<zero,mu,zero,mu,zero>(true, in, next[2], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
             in[0] = curr[0]; in[1] = curr[2]; in[2] = curr[1];
-            esat_neumann_front<lam,lam,mu2>(true, in, next[1], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod);
-            esat_Dy_front(true, curr[1], next[1], nx, ny, nz, dy, 0, nx, 0, nz, mod[0]);
+            esat_neumann_front<lam,lam,lam,mu2,zero>(true, in, next[1], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
+            //esat_Dy_front(true, curr[1], next[1], nx, ny, nz, dy, 0, nx, 0, nz, mod[0]);
         }
         else if (par.bc_front==2)
         {
-            
+            const data_t * in[4] = {curr[1],curr[2],curr[0],prev[0]};
+            esat_neumann_front<mu,zero,zero,mu,simp>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
+            in[2] = curr[2]; in[1] = curr[1]; in[3]=prev[2];
+            esat_neumann_front<zero,mu,zero,mu,simp>(true, in, next[2], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
+            in[0] = curr[0]; in[1] = curr[2]; in[2] = curr[1]; in[3]=prev[1];
+            esat_neumann_front<lam,lam,lam,mu2,pimp>(true, in, next[1], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
         }
         if (par.bc_back==1)
         {
-            const data_t * in[3] = {curr[1],curr[2],curr[0]};
-            esat_neumann_back<mu,zero,mu>(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod);
+            const data_t * in[4] = {curr[1],curr[2],curr[0],prev[0]};
+            esat_neumann_back<mu,zero,zero,mu,zero>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
             in[2] = curr[2]; in[1] = curr[1];
-            esat_neumann_back<zero,mu,mu>(true, in, next[2], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod);
+            esat_neumann_back<zero,mu,zero,mu,zero>(true, in, next[2], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
             in[0] = curr[0]; in[1] = curr[2]; in[2] = curr[1];
-            esat_neumann_back<lam,lam,mu2>(true, in, next[1], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod);
-            esat_Dy_back(true, curr[1], next[1], nx, ny, nz, dy, 0, nx, 0, nz, mod[0]);
+            esat_neumann_back<lam,lam,lam,mu2,zero>(true, in, next[1], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
+            //esat_Dy_back(true, curr[1], next[1], nx, ny, nz, dy, 0, nx, 0, nz, mod[0]);
         }
         else if (par.bc_back==2)
         {
-            
+            const data_t * in[4] = {curr[1],curr[2],curr[0],prev[0]};
+            esat_neumann_back<mu,zero,zero,mu,simp>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
+            in[2] = curr[2]; in[1] = curr[1]; in[3]=prev[2];
+            esat_neumann_back<zero,mu,zero,mu,simp>(true, in, next[2], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
+            in[0] = curr[0]; in[1] = curr[2]; in[2] = curr[1]; in[3]=prev[1];
+            esat_neumann_back<lam,lam,lam,mu2,pimp>(true, in, next[1], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
         }
 
         // update wfld with the 2 steps time recursion
@@ -665,8 +693,8 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
         }
 
         // scale boundaries when relevant (for locally absorbing BC only)
-        data_t * in[3] = {next[0],next[1],next[3]};
-        //esat_scale_boundaries(in, nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, 0, nz, mod, par.dt, par.bc_top==2, par.bc_bottom==2, par.bc_left==2, par.bc_right==2, par.bc_front==2, par.bc_back==2);
+        data_t * in[3] = {next[0],next[1],next[2]};
+        esat_scale_boundaries(in, nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, 0, nz, mod, par.dt, par.bc_top==2, par.bc_bottom==2, par.bc_left==2, par.bc_right==2, par.bc_front==2, par.bc_back==2);
         
         // apply taper 
         //taperz(curr[0], nx, nz, 0, nx, par.taper_top, 0, par.taper_strength);

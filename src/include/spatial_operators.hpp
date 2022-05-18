@@ -24,19 +24,14 @@ void mult_Dz(bool add, const data_t* in, data_t* out, int nx, int ny, int nz, da
 void mult_Dx(bool add, const data_t* in, data_t* out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, const data_t * par);
 void mult_Dy(bool add, const data_t* in, data_t* out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, const data_t * par);
 
-// Apply derivative operator orthogonal to the boundary, to complement the SAT terms
-void esat_Dz_top(bool add, const data_t * in, data_t * __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int iymin, int iymax, const data_t * par);
-void esat_Dz_bottom(bool add, const data_t * in, data_t * __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int iymin, int iymax, const data_t * par);
-void esat_Dx_left(bool add, const data_t * in, data_t * __restrict out, int nx, int ny, int nz, data_t d, int iymin, int iymax, int izmin, int izmax, const data_t * par);
-void esat_Dx_right(bool add, const data_t * in, data_t * __restrict out, int nx, int ny, int nz, data_t d, int iymin, int iymax, int izmin, int izmax, const data_t * par);
-void esat_Dy_front(bool add, const data_t * in, data_t * __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int izmin, int izmax, const data_t * par);
-void esat_Dy_back(bool add, const data_t * in, data_t * __restrict out, int nx, int ny, int nz, data_t d, int ixmin, int ixmax, int izmin, int izmax, const data_t * par);
+// Scale boundaries when absorbing SAT is used. This is needed for the time recursion of wavefields
+void esat_scale_boundaries(data_t** in, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, const data_t** par, data_t dt, bool top, bool bottom, bool left, bool right, bool front, bool back);
 
 // Apply cosine^2 taper to damp the wavefield (to use in conjunction with absorbing SAT)
 // taper = cos[a * pi/2 * (i - istart)/(iend-istart)]^2 ; 0 <= a <= 1
-void taperz(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, data_t a);
-void taperx(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, data_t a);
-void tapery(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, data_t a);
+void taperz(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, int icmin, int icmax, data_t a);
+void taperx(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, int icmin, int icmax, data_t a);
+void tapery(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, int icmin, int icmax, data_t a);
 
 // second derivative operators with variable parameters, defined as template function to accomodate different expressions of parameters
 template<expr f>
@@ -241,8 +236,8 @@ void Dyy_var(bool add, const data_t* in, data_t* __restrict out, int nx, int ny,
 
 // Neumann SAT to impose free surface BC for elastic WE
 // defined as template function to accomodate different expressions of parameters
-template<expr f1, expr f2, expr f3>
-void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int iymin, int iymax, const data_t ** par){
+template<expr f1, expr f2, expr f3, expr f4, expr f5>
+void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int ixmin, int ixmax, int iymin, int iymax, const data_t ** par){
 
     data_t coef[2] = {2.0/3,-1.0/12};
     data_t bnd_coef[24] = {-24.0/17,59.0/34,-4.0/17,-3.0/34,0,0,-0.5,0,0.5,0,0,0,4.0/43,-59.0/86,0,59.0/86,-4.0/43,0,3.0/98,0,-59.0/98,0,32.0/49,-4.0/49};
@@ -255,13 +250,13 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
     int iymaxb=std::min(ny - nc1, iymax);
     data_t adh = 1.0/(dz*h0);
 
-    data_t sumx, sumy, sumz;
+    data_t sumx, sumy, sumz, sumz0;
 
-    // SAT = - Hz-1.(-f1.Dx.in1 -f2.Dy.in2 + f3.Sz.in3)_0
+    // SAT = - Hz-1.(-f1.Dx.in1 -f2.Dy.in2 -f3.Dz.in3 + f4.Sz.in3 - f5.in4/dt)_0
     // Sz is the boundary derivative operator pointing outwards
 
     // top left front
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=iymin; iy<nc1; iy++){
         for (int ix=ixmin; ix<nc1; ix++){
 
@@ -273,19 +268,23 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
                 sumx += bnd_coef[ix*nc2+j] * in[0][IX(j)];
                 sumy += bnd_coef[iy*nc2+j] * in[1][IY(j)];
             }
-
             // (Sz.in3)_0
             sumz = 0;
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IZ(iz)];
             }
+            // (Dz.in3)_0
+            sumz0=0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 += bnd_coef[iz] * in[2][IZ(iz)];
+            }
             iz=0;
-            out[IZ(iz)] = add*out[IZ(iz)] - adh * (-f1(par,IZ(iz))*sumx/dx -f2(par,IZ(iz))*sumy/dy + f3(par,IZ(iz))*sumz/dz);
+            out[IZ(iz)] = add*out[IZ(iz)] - adh * (-f1(par,IZ(iz))*sumx/dx -f2(par,IZ(iz))*sumy/dy -f3(par,IZ(iz))*sumz0/dz + f4(par,IZ(iz))*sumz/dz - f5(par,IZ(iz))*in[3][IZ(iz)]/dt);
         }
     }
 
     // top left back
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=ny-iymax; iy<std::min(nc1,ny-iymin); iy++){
         for (int ix=ixmin; ix<nc1; ix++){
 
@@ -303,13 +302,18 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IXYZ(ix,ny-1-iy,iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 += bnd_coef[iz] * in[2][IXYZ(ix,ny-1-iy,iz)];
+            }
             iz=0;
-            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (-f1(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx -f2(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy + f3(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz);
+            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (-f1(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx -f2(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy -f3(par,IXYZ(ix,ny-1-iy,iz))*sumz0/dz + f4(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz -f5(par,IXYZ(ix,ny-1-iy,iz))*in[3][IXYZ(ix,ny-1-iy,iz)]/dt);
         }
     }
 
     // top left middle
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=iyminb; iy<iymaxb; iy++){
         for (int ix=ixmin; ix<nc1; ix++){
 
@@ -326,13 +330,18 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IZ(iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 += bnd_coef[iz] * in[2][IZ(iz)];
+            }
             iz=0;
-            out[IZ(iz)] = add*out[IZ(iz)] - adh * (-f1(par,IZ(iz))*sumx/dx -f2(par,IZ(iz))*sumy/dy + f3(par,IZ(iz))*sumz/dz);
+            out[IZ(iz)] = add*out[IZ(iz)] - adh * (-f1(par,IZ(iz))*sumx/dx -f2(par,IZ(iz))*sumy/dy -f3(par,IZ(iz))*sumz0/dz + f4(par,IZ(iz))*sumz/dz - f5(par,IZ(iz))*in[3][IZ(iz)]/dt);
         }
     }
 
     // top right front
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=iymin; iy<nc1; iy++){
         for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
 
@@ -350,13 +359,18 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IXYZ(nx-1-ix,iy,iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 += bnd_coef[iz] * in[2][IXYZ(nx-1-ix,iy,iz)];
+            }
             iz=0;
-            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (-f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx -f2(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy + f3(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz);
+            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (-f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx -f2(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy -f3(par,IXYZ(nx-1-ix,iy,iz))*sumz0/dz + f4(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz - f5(par,IXYZ(nx-1-ix,iy,iz))*in[3][IXYZ(nx-1-ix,iy,iz)]/dt);
         }
     }
 
     // top right back
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=ny-iymax; iy<std::min(nc1,ny-iymin); iy++){
         for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
 
@@ -374,13 +388,18 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IXYZ(nx-1-ix,ny-1-iy,iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 += bnd_coef[iz] * in[2][IXYZ(nx-1-ix,ny-1-iy,iz)];
+            }
             iz=0;
-            out[IXYZ(nx-1-ix,ny-1-iy,iz)] = add*out[IXYZ(nx-1-ix,ny-1-iy,iz)] - adh * (-f1(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumx/dx -f2(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumy/dy + f3(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumz/dz);
+            out[IXYZ(nx-1-ix,ny-1-iy,iz)] = add*out[IXYZ(nx-1-ix,ny-1-iy,iz)] - adh * (-f1(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumx/dx -f2(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumy/dy -f3(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumz0/dz + f4(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumz/dz - f5(par,IXYZ(nx-1-ix,ny-1-iy,iz))*in[3][IXYZ(nx-1-ix,ny-1-iy,iz)]/dt);
         }
     }
 
     // top right middle
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=iyminb; iy<iymaxb; iy++){
         for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
 
@@ -397,13 +416,18 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IXYZ(nx-1-ix,iy,iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 += bnd_coef[iz] * in[2][IXYZ(nx-1-ix,iy,iz)];
+            }
             iz=0;
-            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (-f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx -f2(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy + f3(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz);
+            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (-f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx -f2(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy -f3(par,IXYZ(nx-1-ix,iy,iz))*sumz0/dz + f4(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz - f5(par,IXYZ(nx-1-ix,iy,iz))*in[3][IXYZ(nx-1-ix,iy,iz)]/dt);
         }
     }
 
     // top middle front
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=iymin; iy<nc1; iy++){
         for (int ix=ixminb; ix<ixmaxb; ix++){
 
@@ -420,13 +444,18 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IZ(iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 += bnd_coef[iz] * in[2][IZ(iz)];
+            }
             iz=0;
-            out[IZ(iz)] = add*out[IZ(iz)] - adh * (-f1(par,IZ(iz))*sumx/dx -f2(par,IZ(iz))*sumy/dy + f3(par,IZ(iz))*sumz/dz);
+            out[IZ(iz)] = add*out[IZ(iz)] - adh * (-f1(par,IZ(iz))*sumx/dx -f2(par,IZ(iz))*sumy/dy -f3(par,IZ(iz))*sumz0/dz + f4(par,IZ(iz))*sumz/dz - f5(par,IZ(iz))*in[3][IZ(iz)]/dt);
         }
     }
 
     // top middle back
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=ny-iymax; iy<std::min(nc1,ny-iymin); iy++){
         for (int ix=ixminb; ix<ixmaxb; ix++){
 
@@ -443,13 +472,18 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IXYZ(ix,ny-1-iy,iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 += bnd_coef[iz] * in[2][IXYZ(ix,ny-1-iy,iz)];
+            }
             iz=0;
-            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (-f1(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx -f2(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy + f3(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz);
+            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (-f1(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx -f2(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy -f3(par,IXYZ(ix,ny-1-iy,iz))*sumz0/dz + f4(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz - f5(par,IXYZ(ix,ny-1-iy,iz))*in[3][IXYZ(ix,ny-1-iy,iz)]/dt);
         }
     }
 
     // top middle
-    #pragma omp parallel for private(sumx, sumy, sumz)
+    #pragma omp parallel for private(sumx, sumy, sumz, sumz0)
     for (int iy=iyminb; iy<iymaxb; iy++){
         for (int ix=ixminb; ix<ixmaxb; ix++){
 
@@ -463,14 +497,19 @@ void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int n
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IZ(iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 += bnd_coef[iz] * in[2][IZ(iz)];
+            }
             iz=0;
-            out[IZ(iz)] = add*out[IZ(iz)] - adh * (-f1(par,IZ(iz))*sumx/dx -f2(par,IZ(iz))*sumy/dy + f3(par,IZ(iz))*sumz/dz);
+            out[IZ(iz)] = add*out[IZ(iz)] - adh * (-f1(par,IZ(iz))*sumx/dx -f2(par,IZ(iz))*sumy/dy -f3(par,IZ(iz))*sumz0/dz + f4(par,IZ(iz))*sumz/dz - f5(par,IZ(iz))*in[3][IZ(iz)]/dt);
         }
     }
 }
 
-template<expr f1, expr f2, expr f3>
-void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int iymin, int iymax, const data_t ** par){
+template<expr f1, expr f2, expr f3, expr f4, expr f5>
+void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int ixmin, int ixmax, int iymin, int iymax, const data_t ** par){
 
     data_t coef[2] = {2.0/3,-1.0/12};
     data_t bnd_coef[24] = {-24.0/17,59.0/34,-4.0/17,-3.0/34,0,0,-0.5,0,0.5,0,0,0,4.0/43,-59.0/86,0,59.0/86,-4.0/43,0,3.0/98,0,-59.0/98,0,32.0/49,-4.0/49};
@@ -483,13 +522,13 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
     int iymaxb=std::min(ny - nc1, iymax);
     data_t adh = 1.0/(dz*h0);
 
-    data_t sumx, sumy, sumz;
+    data_t sumx, sumy, sumz, sumz0;
 
-    // SAT = - Hz-1.(f1.Dx.in1 + f2.Dy.in2 + f3.Sz.in3)_0
+    // SAT = - Hz-1.(f1.Dx.in1 + f2.Dy.in2 + f3.Dz.in3 + f4.Sz.in3 - f5.in4/dt)_0
     // Sz is the boundary derivative operator pointing outwards
 
     // bottom left front
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=iymin; iy<nc1; iy++){
         for (int ix=ixmin; ix<nc1; ix++){
 
@@ -507,13 +546,18 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IZ(nz-1-iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 -= bnd_coef[iz] * in[2][IZ(nz-1-iz)];
+            }
             iz=nz-1;
-            out[IZ(iz)] = add*out[IZ(iz)] - adh * (f1(par,IZ(iz))*sumx/dx + f2(par,IZ(iz))*sumy/dy + f3(par,IZ(iz))*sumz/dz);
+            out[IZ(iz)] = add*out[IZ(iz)] - adh * (f1(par,IZ(iz))*sumx/dx + f2(par,IZ(iz))*sumy/dy + f3(par,IZ(iz))*sumz0/dz + f4(par,IZ(iz))*sumz/dz -f5(par,IZ(iz))*in[3][IZ(iz)]/dt);
         }
     }
 
     // bottom left back
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=ny-iymax; iy<std::min(nc1,ny-iymin); iy++){
         for (int ix=ixmin; ix<nc1; ix++){
 
@@ -531,13 +575,18 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IXYZ(ix,ny-1-iy,nz-1-iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 -= bnd_coef[iz] * in[2][IXYZ(ix,ny-1-iy,nz-1-iz)];
+            }
             iz=nz-1;
-            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (f1(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx +f2(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy + f3(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz);
+            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (f1(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx +f2(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy +f3(par,IXYZ(ix,ny-1-iy,iz))*sumz0/dz + f4(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz -f5(par,IXYZ(ix,ny-1-iy,iz))*in[3][IXYZ(ix,ny-1-iy,iz)]/dt);
         }
     }
 
     // bottom left middle
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=iyminb; iy<iymaxb; iy++){
         for (int ix=ixmin; ix<nc1; ix++){
 
@@ -554,13 +603,18 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IZ(nz-1-iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 -= bnd_coef[iz] * in[2][IZ(nz-1-iz)];
+            }
             iz=nz-1;
-            out[IZ(iz)] = add*out[IZ(iz)] - adh * (f1(par,IZ(iz))*sumx/dx +f2(par,IZ(iz))*sumy/dy + f3(par,IZ(iz))*sumz/dz);
+            out[IZ(iz)] = add*out[IZ(iz)] - adh * (f1(par,IZ(iz))*sumx/dx +f2(par,IZ(iz))*sumy/dy +f3(par,IZ(iz))*sumz0/dz + f4(par,IZ(iz))*sumz/dz -f5(par,IZ(iz))*in[3][IZ(iz)]/dt);
         }
     }
 
     // bottom right front
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=iymin; iy<nc1; iy++){
         for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
 
@@ -578,13 +632,18 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IXYZ(nx-1-ix,iy,nz-1-iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 -= bnd_coef[iz] * in[2][IXYZ(nx-1-ix,iy,nz-1-iz)];
+            }
             iz=nz-1;
-            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx +f2(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy + f3(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz);
+            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx +f2(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy +f3(par,IXYZ(nx-1-ix,iy,iz))*sumz0/dz + f4(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz -f5(par,IXYZ(nx-1-ix,iy,iz))*in[3][IXYZ(nx-1-ix,iy,iz)]/dt);
         }
     }
 
     // bottom right back
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=ny-iymax; iy<std::min(nc1,ny-iymin); iy++){
         for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
 
@@ -602,13 +661,18 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IXYZ(nx-1-ix,ny-1-iy,nz-1-iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 -= bnd_coef[iz] * in[2][IXYZ(nx-1-ix,ny-1-iy,nz-1-iz)];
+            }
             iz=nz-1;
-            out[IXYZ(nx-1-ix,ny-1-iy,iz)] = add*out[IXYZ(nx-1-ix,ny-1-iy,iz)] - adh * (f1(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumx/dx +f2(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumy/dy + f3(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumz/dz);
+            out[IXYZ(nx-1-ix,ny-1-iy,iz)] = add*out[IXYZ(nx-1-ix,ny-1-iy,iz)] - adh * (f1(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumx/dx +f2(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumy/dy +f3(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumz0/dz + f4(par,IXYZ(nx-1-ix,ny-1-iy,iz))*sumz/dz -f5(par,IXYZ(nx-1-ix,ny-1-iy,iz))*in[3][IXYZ(nx-1-ix,ny-1-iy,iz)]/dt);
         }
     }
 
     // bottom right middle
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=iyminb; iy<iymaxb; iy++){
         for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
 
@@ -625,13 +689,18 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IXYZ(nx-1-ix,iy,nz-1-iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 -= bnd_coef[iz] * in[2][IXYZ(nx-1-ix,iy,nz-1-iz)];
+            }
             iz=nz-1;
-            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx +f2(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy + f3(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz);
+            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx +f2(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy +f3(par,IXYZ(nx-1-ix,iy,iz))*sumz0/dz + f4(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz -f5(par,IXYZ(nx-1-ix,iy,iz))*in[3][IXYZ(nx-1-ix,iy,iz)]/dt);
         }
     }
 
     // bottom middle front
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=iymin; iy<nc1; iy++){
         for (int ix=ixminb; ix<ixmaxb; ix++){
 
@@ -648,13 +717,18 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IZ(nz-1-iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 -= bnd_coef[iz] * in[2][IZ(nz-1-iz)];
+            }
             iz=nz-1;
-            out[IZ(iz)] = add*out[IZ(iz)] - adh * (f1(par,IZ(iz))*sumx/dx +f2(par,IZ(iz))*sumy/dy + f3(par,IZ(iz))*sumz/dz);
+            out[IZ(iz)] = add*out[IZ(iz)] - adh * (f1(par,IZ(iz))*sumx/dx +f2(par,IZ(iz))*sumy/dy +f3(par,IZ(iz))*sumz0/dz + f4(par,IZ(iz))*sumz/dz -f5(par,IZ(iz))*in[3][IZ(iz)]/dt);
         }
     }
 
     // bottom middle back
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumz0)
     for (int iy=ny-iymax; iy<std::min(nc1,ny-iymin); iy++){
         for (int ix=ixminb; ix<ixmaxb; ix++){
 
@@ -671,13 +745,18 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IXYZ(ix,ny-1-iy,nz-1-iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 -= bnd_coef[iz] * in[2][IXYZ(ix,ny-1-iy,nz-1-iz)];
+            }
             iz=nz-1;
-            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (f1(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx +f2(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy + f3(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz);
+            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (f1(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx +f2(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy +f3(par,IXYZ(ix,ny-1-iy,iz))*sumz0/dz + f4(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz -f5(par,IXYZ(ix,ny-1-iy,iz))*in[3][IXYZ(ix,ny-1-iy,iz)]/dt);
         }
     }
 
     // bottom middle
-    #pragma omp parallel for private(sumx, sumy, sumz)
+    #pragma omp parallel for private(sumx, sumy, sumz,sumz0)
     for (int iy=iyminb; iy<iymaxb; iy++){
         for (int ix=ixminb; ix<ixmaxb; ix++){
 
@@ -691,14 +770,19 @@ void esat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, in
             for (iz = 0; iz < 4; iz++){
                 sumz += scoef[iz] * in[2][IZ(nz-1-iz)];
             }
+            // (Dz.in3)_0
+            sumz0 = 0;
+            for (iz = 0; iz < 6; iz++){
+                sumz0 -= bnd_coef[iz] * in[2][IZ(nz-1-iz)];
+            }
             iz=nz-1;
-            out[IZ(iz)] = add*out[IZ(iz)] - adh * (f1(par,IZ(iz))*sumx/dx +f2(par,IZ(iz))*sumy/dy + f3(par,IZ(iz))*sumz/dz);
+            out[IZ(iz)] = add*out[IZ(iz)] - adh * (f1(par,IZ(iz))*sumx/dx +f2(par,IZ(iz))*sumy/dy +f3(par,IZ(iz))*sumz0/dz + f4(par,IZ(iz))*sumz/dz -f5(par,IZ(iz))*in[3][IZ(iz)]/dt);
         }
     }
 }
 
-template<expr f1, expr f2, expr f3>
-void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int iymin, int iymax, int izmin, int izmax, const data_t ** par){
+template<expr f1, expr f2, expr f3, expr f4, expr f5>
+void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int iymin, int iymax, int izmin, int izmax, const data_t ** par){
 
     data_t coef[2] = {2.0/3,-1.0/12};
     data_t bnd_coef[24] = {-24.0/17,59.0/34,-4.0/17,-3.0/34,0,0,-0.5,0,0.5,0,0,0,4.0/43,-59.0/86,0,59.0/86,-4.0/43,0,3.0/98,0,-59.0/98,0,32.0/49,-4.0/49};
@@ -711,13 +795,13 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
     int izmaxb=std::min(nz - nc1, izmax);
     data_t adh = 1.0/(dx*h0);
 
-    data_t sumx, sumy, sumz;
+    data_t sumx, sumy, sumz, sumx0;
 
-    // SAT = - Hx-1.(-f1.Dy.in1 -f2.Dz.in2 + f3.Sx.in3)_0
+    // SAT = - Hx-1.(-f1.Dy.in1 -f2.Dz.in2 -f3.Dx.in3 + f4.Sx.in3 - f5.in4/dt)_0
     // Sx is the boundary derivative operator pointing outwards
 
     // left top front
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=iymin; iy<nc1; iy++){
         for (int iz=izmin; iz<nc1; iz++){
 
@@ -735,13 +819,18 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IX(ix)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 += bnd_coef[ix] * in[2][IX(ix)];
+            }
             ix=0;
-            out[IX(ix)] = add*out[IX(ix)] - adh * (-f1(par,IX(ix))*sumy/dy -f2(par,IX(ix))*sumz/dz + f3(par,IX(ix))*sumx/dx);
+            out[IX(ix)] = add*out[IX(ix)] - adh * (-f1(par,IX(ix))*sumy/dy -f2(par,IX(ix))*sumz/dz -f3(par,IX(ix))*sumx0/dx + f4(par,IX(ix))*sumx/dx -f5(par,IX(ix))*in[3][IX(ix)]/dt);
         }
     }
 
     // left top back
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=ny-iymax; iy<std::min(nc1,ny-iymin); iy++){
         for (int iz=izmin; iz<nc1; iz++){
 
@@ -759,13 +848,18 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IXYZ(ix,ny-1-iy,iz)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 += bnd_coef[ix] * in[2][IXYZ(ix,ny-1-iy,iz)];
+            }
             ix=0;
-            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (-f1(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy -f2(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz + f3(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx);
+            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (-f1(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy -f2(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz -f3(par,IXYZ(ix,ny-1-iy,iz))*sumx0/dx + f4(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx -f5(par,IXYZ(ix,ny-1-iy,iz))*in[3][IXYZ(ix,ny-1-iy,iz)]/dt);
         }
     }
 
     // left top middle
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=iyminb; iy<iymaxb; iy++){
         for (int iz=izmin; iz<nc1; iz++){
 
@@ -782,13 +876,18 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IX(ix)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 += bnd_coef[ix] * in[2][IX(ix)];
+            }
             ix=0;
-            out[IX(ix)] = add*out[IX(ix)] - adh * (-f1(par,IX(ix))*sumy/dy -f2(par,IX(ix))*sumz/dz + f3(par,IX(ix))*sumx/dx);
+            out[IX(ix)] = add*out[IX(ix)] - adh * (-f1(par,IX(ix))*sumy/dy -f2(par,IX(ix))*sumz/dz -f3(par,IX(ix))*sumx0/dx + f4(par,IX(ix))*sumx/dx -f5(par,IX(ix))*in[3][IX(ix)]/dt);;
         }
     }
 
     // left bottom front
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=iymin; iy<nc1; iy++){
         for (int iz=nz-izmax; iz<std::min(nc1,nz-izmin); iz++){
 
@@ -806,13 +905,18 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IXYZ(ix,iy,nz-1-iz)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 += bnd_coef[ix] * in[2][IXYZ(ix,iy,nz-1-iz)];
+            }
             ix=0;
-            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (-f1(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy -f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz + f3(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx);
+            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (-f1(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy -f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz -f3(par,IXYZ(ix,iy,nz-1-iz))*sumx0/dx + f4(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx -f5(par,IXYZ(ix,iy,nz-1-iz))*in[3][IXYZ(ix,iy,nz-1-iz)]/dt);;
         }
     }
 
     // left bottom back
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=ny-iymax; iy<std::min(nc1,ny-iymin); iy++){
         for (int iz=nz-izmax; iz<std::min(nc1,nz-izmin); iz++){
 
@@ -830,13 +934,18 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IXYZ(ix,ny-1-iy,nz-1-iz)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 += bnd_coef[ix] * in[2][IXYZ(ix,ny-1-iy,nz-1-iz)];
+            }
             ix=0;
-            out[IXYZ(ix,ny-1-iy,nz-1-iz)] = add*out[IXYZ(ix,ny-1-iy,nz-1-iz)] - adh * (-f1(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumy/dy -f2(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumz/dz + f3(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumx/dx);
+            out[IXYZ(ix,ny-1-iy,nz-1-iz)] = add*out[IXYZ(ix,ny-1-iy,nz-1-iz)] - adh * (-f1(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumy/dy -f2(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumz/dz -f3(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumx0/dx + f4(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumx/dx -f5(par,IXYZ(ix,ny-1-iy,nz-1-iz))*in[3][IXYZ(ix,ny-1-iy,nz-1-iz)]/dt);;
         }
     }
 
     // left bottom middle
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=iyminb; iy<iymaxb; iy++){
         for (int iz=nz-izmax; iz<std::min(nc1,nz-izmin); iz++){
 
@@ -853,13 +962,18 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IXYZ(ix,iy,nz-1-iz)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 += bnd_coef[ix] * in[2][IXYZ(ix,iy,nz-1-iz)];
+            }
             ix=0;
-            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (-f1(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy -f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz + f3(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx);
+            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (-f1(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy -f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz -f3(par,IXYZ(ix,iy,nz-1-iz))*sumx0/dx + f4(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx -f5(par,IXYZ(ix,iy,nz-1-iz))*in[3][IXYZ(ix,iy,nz-1-iz)]/dt);;
         }
     }
 
     // left middle front
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=iymin; iy<nc1; iy++){
         for (int iz=izminb; iz<izmaxb; iz++){
 
@@ -876,13 +990,18 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IX(ix)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 += bnd_coef[ix] * in[2][IX(ix)];
+            }
             ix=0;
-            out[IX(ix)] = add*out[IX(ix)] - adh * (-f1(par,IX(ix))*sumy/dy -f2(par,IX(ix))*sumz/dz + f3(par,IX(ix))*sumx/dx);
+            out[IX(ix)] = add*out[IX(ix)] - adh * (-f1(par,IX(ix))*sumy/dy -f2(par,IX(ix))*sumz/dz -f3(par,IX(ix))*sumx0/dx + f4(par,IX(ix))*sumx/dx -f5(par,IX(ix))*in[3][IX(ix)]/dt);;
         }
     }
 
     // left middle back
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=ny-iymax; iy<std::min(nc1,ny-iymin); iy++){
         for (int iz=izminb; iz<izmaxb; iz++){
 
@@ -899,8 +1018,13 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IXYZ(ix,ny-1-iy,iz)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 += bnd_coef[ix] * in[2][IXYZ(ix,ny-1-iy,iz)];
+            }
             ix=0;
-            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (-f1(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy -f2(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz + f3(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx);
+            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (-f1(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy -f2(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz -f3(par,IXYZ(ix,ny-1-iy,iz))*sumx0/dx + f4(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx -f5(par,IXYZ(ix,ny-1-iy,iz))*in[3][IXYZ(ix,ny-1-iy,iz)]/dt);;
         }
     }
 
@@ -919,14 +1043,19 @@ void esat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int 
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IX(ix)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 += bnd_coef[ix] * in[2][IX(ix)];
+            }
             ix=0;
-            out[IX(ix)] = add*out[IX(ix)] - adh * (-f1(par,IX(ix))*sumy/dy -f2(par,IX(ix))*sumz/dz + f3(par,IX(ix))*sumx/dx);
+            out[IX(ix)] = add*out[IX(ix)] - adh * (-f1(par,IX(ix))*sumy/dy -f2(par,IX(ix))*sumz/dz -f3(par,IX(ix))*sumx0/dx + f4(par,IX(ix))*sumx/dx -f5(par,IX(ix))*in[3][IX(ix)]/dt);;
         }
     }
 }
 
-template<expr f1, expr f2, expr f3>
-void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int iymin, int iymax, int izmin, int izmax, const data_t ** par){
+template<expr f1, expr f2, expr f3, expr f4, expr f5>
+void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int iymin, int iymax, int izmin, int izmax, const data_t ** par){
 
     data_t coef[2] = {2.0/3,-1.0/12};
     data_t bnd_coef[24] = {-24.0/17,59.0/34,-4.0/17,-3.0/34,0,0,-0.5,0,0.5,0,0,0,4.0/43,-59.0/86,0,59.0/86,-4.0/43,0,3.0/98,0,-59.0/98,0,32.0/49,-4.0/49};
@@ -939,13 +1068,13 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
     int izmaxb=std::min(nz - nc1, izmax);
     data_t adh = 1.0/(dx*h0);
 
-    data_t sumx, sumy, sumz;
+    data_t sumx, sumy, sumz, sumx0;
 
-    // SAT = - Hx-1.(f1.Dy.in1 +f2.Dz.in2 + f3.Sx.in3)_0
+    // SAT = - Hx-1.(f1.Dy.in1 +f2.Dz.in2 + f3.Dx.in3 + f4.Sx.in3 - f5.in4/dt)_0
     // Sx is the boundary derivative operator pointing outwards
 
     // right top front
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=iymin; iy<nc1; iy++){
         for (int iz=izmin; iz<nc1; iz++){
 
@@ -963,13 +1092,18 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IX(nx-1-ix)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 -= bnd_coef[ix] * in[2][IX(nx-1-ix)];
+            }
             ix=nx-1;
-            out[IX(ix)] = add*out[IX(ix)] - adh * (f1(par,IX(ix))*sumy/dy +f2(par,IX(ix))*sumz/dz + f3(par,IX(ix))*sumx/dx);
+            out[IX(ix)] = add*out[IX(ix)] - adh * (f1(par,IX(ix))*sumy/dy +f2(par,IX(ix))*sumz/dz +f3(par,IX(ix))*sumx0/dx + f4(par,IX(ix))*sumx/dx -f5(par,IX(ix))*in[3][IX(ix)]/dt);
         }
     }
 
     // right top back
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=ny-iymax; iy<std::min(nc1,ny-iymin); iy++){
         for (int iz=izmin; iz<nc1; iz++){
 
@@ -987,13 +1121,18 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IXYZ(nx-1-ix,ny-1-iy,iz)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 -= bnd_coef[ix] * in[2][IXYZ(nx-1-ix,ny-1-iy,iz)];
+            }
             ix=nx-1;
-            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (f1(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy +f2(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz + f3(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx);
+            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (f1(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy +f2(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz +f3(par,IXYZ(ix,ny-1-iy,iz))*sumx0/dx + f4(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx -f5(par,IXYZ(ix,ny-1-iy,iz))*in[3][IXYZ(ix,ny-1-iy,iz)]/dt);
         }
     }
 
     // right top middle
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=iyminb; iy<iymaxb; iy++){
         for (int iz=izmin; iz<nc1; iz++){
 
@@ -1010,13 +1149,18 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IX(nx-1-ix)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 -= bnd_coef[ix] * in[2][IX(nx-1-ix)];
+            }
             ix=nx-1;
-            out[IX(ix)] = add*out[IX(ix)] - adh * (f1(par,IX(ix))*sumy/dy +f2(par,IX(ix))*sumz/dz + f3(par,IX(ix))*sumx/dx);
+            out[IX(ix)] = add*out[IX(ix)] - adh * (f1(par,IX(ix))*sumy/dy +f2(par,IX(ix))*sumz/dz +f3(par,IX(ix))*sumx0/dx + f4(par,IX(ix))*sumx/dx -f5(par,IX(ix))*in[3][IX(ix)]/dt);
         }
     }
 
     // right bottom front
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=iymin; iy<nc1; iy++){
         for (int iz=nz-izmax; iz<std::min(nc1,nz-izmin); iz++){
 
@@ -1034,13 +1178,18 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IXYZ(nx-1-ix,iy,nz-1-iz)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 -= bnd_coef[ix] * in[2][IXYZ(nx-1-ix,iy,nz-1-iz)];
+            }
             ix=nx-1;
-            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (f1(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy +f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz + f3(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx);
+            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (f1(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy +f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz +f3(par,IXYZ(ix,iy,nz-1-iz))*sumx0/dx + f4(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx -f5(par,IXYZ(ix,iy,nz-1-iz))*in[3][IXYZ(ix,iy,nz-1-iz)]/dt);
         }
     }
 
     // right bottom back
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=ny-iymax; iy<std::min(nc1,ny-iymin); iy++){
         for (int iz=nz-izmax; iz<std::min(nc1,nz-izmin); iz++){
 
@@ -1058,13 +1207,18 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IXYZ(nx-1-ix,ny-1-iy,nz-1-iz)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 -= bnd_coef[ix] * in[2][IXYZ(nx-1-ix,ny-1-iy,nz-1-iz)];
+            }
             ix=nx-1;
-            out[IXYZ(ix,ny-1-iy,nz-1-iz)] = add*out[IXYZ(ix,ny-1-iy,nz-1-iz)] - adh * (f1(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumy/dy +f2(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumz/dz + f3(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumx/dx);
+            out[IXYZ(ix,ny-1-iy,nz-1-iz)] = add*out[IXYZ(ix,ny-1-iy,nz-1-iz)] - adh * (f1(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumy/dy +f2(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumz/dz +f3(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumx0/dx + f4(par,IXYZ(ix,ny-1-iy,nz-1-iz))*sumx/dx -f5(par,IXYZ(ix,ny-1-iy,nz-1-iz))*in[3][IXYZ(ix,ny-1-iy,nz-1-iz)]/dt);
         }
     }
 
     // right bottom middle
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=iyminb; iy<iymaxb; iy++){
         for (int iz=nz-izmax; iz<std::min(nc1,nz-izmin); iz++){
 
@@ -1081,13 +1235,18 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IXYZ(nx-1-ix,iy,nz-1-iz)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 -= bnd_coef[ix] * in[2][IXYZ(nx-1-ix,iy,nz-1-iz)];
+            }
             ix=nx-1;
-            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (f1(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy +f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz + f3(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx);
+            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (f1(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy +f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz +f3(par,IXYZ(ix,iy,nz-1-iz))*sumx0/dx + f4(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx -f5(par,IXYZ(ix,iy,nz-1-iz))*in[3][IXYZ(ix,iy,nz-1-iz)]/dt);
         }
     }
 
     // right middle front
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=iymin; iy<nc1; iy++){
         for (int iz=izminb; iz<izmaxb; iz++){
 
@@ -1104,13 +1263,18 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IX(nx-1-ix)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 -= bnd_coef[ix] * in[2][IX(nx-1-ix)];
+            }
             ix=nx-1;
-            out[IX(ix)] = add*out[IX(ix)] - adh * (f1(par,IX(ix))*sumy/dy +f2(par,IX(ix))*sumz/dz + f3(par,IX(ix))*sumx/dx);
+            out[IX(ix)] = add*out[IX(ix)] - adh * (f1(par,IX(ix))*sumy/dy +f2(par,IX(ix))*sumz/dz +f3(par,IX(ix))*sumx0/dx + f4(par,IX(ix))*sumx/dx -f5(par,IX(ix))*in[3][IX(ix)]/dt);
         }
     }
 
     // right middle back
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumx0)
     for (int iy=ny-iymax; iy<std::min(nc1,ny-iymin); iy++){
         for (int iz=izminb; iz<izmaxb; iz++){
 
@@ -1127,8 +1291,13 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IXYZ(nx-1-ix,ny-1-iy,iz)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 -= bnd_coef[ix] * in[2][IXYZ(nx-1-ix,ny-1-iy,iz)];
+            }
             ix=nx-1;
-            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (f1(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy +f2(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz + f3(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx);
+            out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] - adh * (f1(par,IXYZ(ix,ny-1-iy,iz))*sumy/dy +f2(par,IXYZ(ix,ny-1-iy,iz))*sumz/dz +f3(par,IXYZ(ix,ny-1-iy,iz))*sumx0/dx + f4(par,IXYZ(ix,ny-1-iy,iz))*sumx/dx -f5(par,IXYZ(ix,ny-1-iy,iz))*in[3][IXYZ(ix,ny-1-iy,iz)]/dt);
         }
     }
 
@@ -1147,14 +1316,19 @@ void esat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int
             for (ix = 0; ix < 4; ix++){
                 sumx += scoef[ix] * in[2][IX(nx-1-ix)];
             }
+            // (Dx.in3)_0
+            sumx0 = 0;
+            for (ix = 0; ix < 6; ix++){
+                sumx0 -= bnd_coef[ix] * in[2][IX(nx-1-ix)];
+            }
             ix=nx-1;
-            out[IX(ix)] = add*out[IX(ix)] - adh * (f1(par,IX(ix))*sumy/dy +f2(par,IX(ix))*sumz/dz + f3(par,IX(ix))*sumx/dx);
+            out[IX(ix)] = add*out[IX(ix)] - adh * (f1(par,IX(ix))*sumy/dy +f2(par,IX(ix))*sumz/dz +f3(par,IX(ix))*sumx0/dx + f4(par,IX(ix))*sumx/dx -f5(par,IX(ix))*in[3][IX(ix)]/dt);
         }
     }
 }
 
-template<expr f1, expr f2, expr f3>
-void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int izmin, int izmax, const data_t ** par){
+template<expr f1, expr f2, expr f3, expr f4, expr f5>
+void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int ixmin, int ixmax, int izmin, int izmax, const data_t ** par){
 
     data_t coef[2] = {2.0/3,-1.0/12};
     data_t bnd_coef[24] = {-24.0/17,59.0/34,-4.0/17,-3.0/34,0,0,-0.5,0,0.5,0,0,0,4.0/43,-59.0/86,0,59.0/86,-4.0/43,0,3.0/98,0,-59.0/98,0,32.0/49,-4.0/49};
@@ -1167,13 +1341,13 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
     int izmaxb=std::min(nz - nc1, izmax);
     data_t adh = 1.0/(dy*h0);
 
-    data_t sumx, sumy, sumz;
+    data_t sumx, sumy, sumz, sumy0;
 
-    // SAT = - Hy-1.(-f1.Dx.in1 -f2.Dz.in2 + f3.Sy.in3)_0
+    // SAT = - Hy-1.(-f1.Dx.in1 -f2.Dz.in2 -f3.Dy.in3 + f4.Sy.in3 - f5.in4/dt)_0
     // Sy is the boundary derivative operator pointing outwards
 
     // front top left
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=ixmin; ix<nc1; ix++){
         for (int iz=izmin; iz<nc1; iz++){
 
@@ -1191,13 +1365,18 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IY(iy)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 += bnd_coef[iy] * in[2][IY(iy)];
+            }
             iy=0;
-            out[IY(iy)] = add*out[IY(iy)] - adh * (-f1(par,IY(iy))*sumx/dx -f2(par,IY(iy))*sumz/dz + f3(par,IY(iy))*sumy/dy);
+            out[IY(iy)] = add*out[IY(iy)] - adh * (-f1(par,IY(iy))*sumx/dx -f2(par,IY(iy))*sumz/dz -f3(par,IY(iy))*sumy0/dy + f4(par,IY(iy))*sumy/dy -f5(par,IY(iy))*in[3][IY(iy)]/dt);
         }
     }
 
     // front bottom left
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=ixmin; ix<nc1; ix++){
         for (int iz=nz-izmax; iz<std::min(nc1,nz-izmin); iz++){
 
@@ -1215,13 +1394,18 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IXYZ(ix,iy,nz-1-iz)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 += bnd_coef[iy] * in[2][IXYZ(ix,iy,nz-1-iz)];
+            }
             iy=0;
-            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (-f1(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx -f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz + f3(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy);
+            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (-f1(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx -f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz -f3(par,IXYZ(ix,iy,nz-1-iz))*sumy0/dy + f4(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy -f5(par,IXYZ(ix,iy,nz-1-iz))*in[3][IXYZ(ix,iy,nz-1-iz)]/dt);
         }
     }
 
     // front middle left
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=ixmin; ix<nc1; ix++){
         for (int iz=izminb; iz<izmaxb; iz++){
         
@@ -1238,13 +1422,18 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IY(iy)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 += bnd_coef[iy] * in[2][IY(iy)];
+            }
             iy=0;
-            out[IY(iy)] = add*out[IY(iy)] - adh * (-f1(par,IY(iy))*sumx/dx -f2(par,IY(iy))*sumz/dz + f3(par,IY(iy))*sumy/dy);
+            out[IY(iy)] = add*out[IY(iy)] - adh * (-f1(par,IY(iy))*sumx/dx -f2(par,IY(iy))*sumz/dz -f3(par,IY(iy))*sumy0/dy + f4(par,IY(iy))*sumy/dy -f5(par,IY(iy))*in[3][IY(iy)]/dt);
         }
     }
 
     // front top right
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
         for (int iz=izmin; iz<nc1; iz++){
 
@@ -1262,13 +1451,18 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IXYZ(nx-1-ix,iy,iz)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 += bnd_coef[iy] * in[2][IXYZ(nx-1-ix,iy,iz)];
+            }
             iy=0;
-            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (-f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx -f2(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz + f3(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy);
+            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (-f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx -f2(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz -f3(par,IXYZ(nx-1-ix,iy,iz))*sumy0/dy + f4(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy -f5(par,IXYZ(nx-1-ix,iy,iz))*in[3][IXYZ(nx-1-ix,iy,iz)]/dt);
         }
     }
 
     // front bottom right
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
         for (int iz=nz-izmax; iz<std::min(nc1,nz-izmin); iz++){
 
@@ -1286,13 +1480,18 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IXYZ(nx-1-ix,iy,nz-1-iz)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 += bnd_coef[iy] * in[2][IXYZ(nx-1-ix,iy,nz-1-iz)];
+            }
             iy=0;
-            out[IXYZ(nx-1-ix,iy,nz-1-iz)] = add*out[IXYZ(nx-1-ix,iy,nz-1-iz)] - adh * (-f1(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumx/dx -f2(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumz/dz + f3(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumy/dy);
+            out[IXYZ(nx-1-ix,iy,nz-1-iz)] = add*out[IXYZ(nx-1-ix,iy,nz-1-iz)] - adh * (-f1(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumx/dx -f2(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumz/dz -f3(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumy0/dy + f4(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumy/dy -f5(par,IXYZ(nx-1-ix,iy,nz-1-iz))*in[3][IXYZ(nx-1-ix,iy,nz-1-iz)]/dt);
         }
     }
 
     // front middle right
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
         for (int iz=izminb; iz<izmaxb; iz++){
 
@@ -1309,13 +1508,18 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IXYZ(nx-1-ix,iy,iz)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 += bnd_coef[iy] * in[2][IXYZ(nx-1-ix,iy,iz)];
+            }
             iy=0;
-            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (-f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx -f2(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz + f3(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy);
+            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (-f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx -f2(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz -f3(par,IXYZ(nx-1-ix,iy,iz))*sumy0/dy + f4(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy -f5(par,IXYZ(nx-1-ix,iy,iz))*in[3][IXYZ(nx-1-ix,iy,iz)]/dt);
         }
     }
 
     // front top middle
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=ixminb; ix<ixmaxb; ix++){
         for (int iz=izmin; iz<nc1; iz++){
 
@@ -1332,13 +1536,18 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IY(iy)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 += bnd_coef[iy] * in[2][IY(iy)];
+            }
             iy=0;
-            out[IY(iy)] = add*out[IY(iy)] - adh * (-f1(par,IY(iy))*sumx/dx -f2(par,IY(iy))*sumz/dz + f3(par,IY(iy))*sumy/dy);
+            out[IY(iy)] = add*out[IY(iy)] - adh * (-f1(par,IY(iy))*sumx/dx -f2(par,IY(iy))*sumz/dz -f3(par,IY(iy))*sumy0/dy + f4(par,IY(iy))*sumy/dy -f5(par,IY(iy))*in[3][IY(iy)]/dt);
         }
     }
 
     // front bottom middle
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=ixminb; ix<ixmaxb; ix++){
         for (int iz=nz-izmax; iz<std::min(nc1,nz-izmin); iz++){
 
@@ -1355,13 +1564,18 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IXYZ(ix,iy,nz-1-iz)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 += bnd_coef[iy] * in[2][IXYZ(ix,iy,nz-1-iz)];
+            }
             iy=0;
-            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (-f1(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx -f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz + f3(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy);
+            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (-f1(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx -f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz -f3(par,IXYZ(ix,iy,nz-1-iz))*sumy0/dy + f4(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy -f5(par,IXYZ(ix,iy,nz-1-iz))*in[3][IXYZ(ix,iy,nz-1-iz)]/dt);
         }
     }
 
     // front middle
-    #pragma omp parallel for private(sumx, sumy, sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=ixminb; ix<ixmaxb; ix++){
         for (int iz=izminb; iz<izmaxb; iz++){
 
@@ -1375,14 +1589,19 @@ void esat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IY(iy)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 += bnd_coef[iy] * in[2][IY(iy)];
+            }
             iy=0;
-            out[IY(iy)] = add*out[IY(iy)] - adh * (-f1(par,IY(iy))*sumx/dx -f2(par,IY(iy))*sumz/dz + f3(par,IY(iy))*sumy/dy);
+            out[IY(iy)] = add*out[IY(iy)] - adh * (-f1(par,IY(iy))*sumx/dx -f2(par,IY(iy))*sumz/dz -f3(par,IY(iy))*sumy0/dy + f4(par,IY(iy))*sumy/dy -f5(par,IY(iy))*in[3][IY(iy)]/dt);
         }
     }
 }
 
-template<expr f1, expr f2, expr f3>
-void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int izmin, int izmax, const data_t ** par){
+template<expr f1, expr f2, expr f3, expr f4, expr f5>
+void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int ixmin, int ixmax, int izmin, int izmax, const data_t ** par){
 
     data_t coef[2] = {2.0/3,-1.0/12};
     data_t bnd_coef[24] = {-24.0/17,59.0/34,-4.0/17,-3.0/34,0,0,-0.5,0,0.5,0,0,0,4.0/43,-59.0/86,0,59.0/86,-4.0/43,0,3.0/98,0,-59.0/98,0,32.0/49,-4.0/49};
@@ -1395,13 +1614,13 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
     int izmaxb=std::min(ny - nc1, izmax);
     data_t adh = 1.0/(dy*h0);
 
-    data_t sumx, sumy, sumz;
+    data_t sumx, sumy, sumz, sumy0;
 
-    // SAT = - Hy-1.(f1.Dx.in1 + f2.Dz.in2 + f3.Sy.in3)_0
+    // SAT = - Hy-1.(f1.Dx.in1 + f2.Dz.in2 + f3.Dy.in3 + f4.Sy.in3 - f5.in4/dt)_0
     // Sy is the boundary derivative operator pointing outwards
 
     // back top left
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=ixmin; ix<nc1; ix++){
         for (int iz=izmin; iz<nc1; iz++){
 
@@ -1419,13 +1638,18 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IY(ny-1-iy)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 -= bnd_coef[iy] * in[2][IY(ny-1-iy)];
+            }
             iy=ny-1;
-            out[IY(iy)] = add*out[IY(iy)] - adh * (f1(par,IY(iy))*sumx/dx +f2(par,IY(iy))*sumz/dz + f3(par,IY(iy))*sumy/dy);
+            out[IY(iy)] = add*out[IY(iy)] - adh * (f1(par,IY(iy))*sumx/dx +f2(par,IY(iy))*sumz/dz +f3(par,IY(iy))*sumy0/dy + f4(par,IY(iy))*sumy/dy -f5(par,IY(iy))*in[3][IY(iy)]/dt);
         }
     }
 
     // back bottom left
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=ixmin; ix<nc1; ix++){
         for (int iz=nz-izmax; iz<std::min(nc1,nz-izmin); iz++){
 
@@ -1443,13 +1667,18 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IXYZ(ix,ny-1-iy,nz-1-iz)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 -= bnd_coef[iy] * in[2][IXYZ(ix,ny-1-iy,nz-1-iz)];
+            }
             iy=ny-1;
-            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (f1(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx +f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz + f3(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy);
+            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (f1(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx +f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz +f3(par,IXYZ(ix,iy,nz-1-iz))*sumy0/dy + f4(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy -f5(par,IXYZ(ix,iy,nz-1-iz))*in[3][IXYZ(ix,iy,nz-1-iz)]/dt);
         }
     }
 
     // back middle left
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=ixmin; ix<nc1; ix++){
         for (int iz=izminb; iz<izmaxb; iz++){
         
@@ -1466,13 +1695,18 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IY(ny-1-iy)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 -= bnd_coef[iy] * in[2][IY(ny-1-iy)];
+            }
             iy=ny-1;
-            out[IY(iy)] = add*out[IY(iy)] - adh * (f1(par,IY(iy))*sumx/dx +f2(par,IY(iy))*sumz/dz + f3(par,IY(iy))*sumy/dy);
+            out[IY(iy)] = add*out[IY(iy)] - adh * (f1(par,IY(iy))*sumx/dx +f2(par,IY(iy))*sumz/dz +f3(par,IY(iy))*sumy0/dy + f4(par,IY(iy))*sumy/dy -f5(par,IY(iy))*in[3][IY(iy)]/dt);
         }
     }
 
     // back top right
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
         for (int iz=izmin; iz<nc1; iz++){
 
@@ -1490,13 +1724,18 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IXYZ(nx-1-ix,ny-1-iy,iz)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 -= bnd_coef[iy] * in[2][IXYZ(nx-1-ix,ny-1-iy,iz)];
+            }
             iy=ny-1;
-            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx +f2(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz + f3(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy);
+            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx +f2(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz +f3(par,IXYZ(nx-1-ix,iy,iz))*sumy0/dy + f4(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy -f5(par,IXYZ(nx-1-ix,iy,iz))*in[3][IXYZ(nx-1-ix,iy,iz)]/dt);
         }
     }
 
     // back bottom right
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
         for (int iz=nz-izmax; iz<std::min(nc1,nz-izmin); iz++){
 
@@ -1514,13 +1753,18 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IXYZ(nx-1-ix,ny-1-iy,nz-1-iz)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 -= bnd_coef[iy] * in[2][IXYZ(nx-1-ix,ny-1-iy,nz-1-iz)];
+            }
             iy=ny-1;
-            out[IXYZ(nx-1-ix,iy,nz-1-iz)] = add*out[IXYZ(nx-1-ix,iy,nz-1-iz)] - adh * (f1(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumx/dx +f2(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumz/dz + f3(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumy/dy);
+            out[IXYZ(nx-1-ix,iy,nz-1-iz)] = add*out[IXYZ(nx-1-ix,iy,nz-1-iz)] - adh * (f1(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumx/dx +f2(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumz/dz +f3(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumy0/dy + f4(par,IXYZ(nx-1-ix,iy,nz-1-iz))*sumy/dy -f5(par,IXYZ(nx-1-ix,iy,nz-1-iz))*in[3][IXYZ(nx-1-ix,iy,nz-1-iz)]/dt);
         }
     }
 
     // back middle right
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=nx-ixmax; ix<std::min(nc1,nx-ixmin); ix++){
         for (int iz=izminb; iz<izmaxb; iz++){
 
@@ -1537,13 +1781,18 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IXYZ(nx-1-ix,ny-1-iy,iz)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 -= bnd_coef[iy] * in[2][IXYZ(nx-1-ix,ny-1-iy,iz)];
+            }
             iy=ny-1;
-            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx +f2(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz + f3(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy);
+            out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] - adh * (f1(par,IXYZ(nx-1-ix,iy,iz))*sumx/dx +f2(par,IXYZ(nx-1-ix,iy,iz))*sumz/dz +f3(par,IXYZ(nx-1-ix,iy,iz))*sumy0/dy + f4(par,IXYZ(nx-1-ix,iy,iz))*sumy/dy -f5(par,IXYZ(nx-1-ix,iy,iz))*in[3][IXYZ(nx-1-ix,iy,iz)]/dt);
         }
     }
 
     // back top middle
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=ixminb; ix<ixmaxb; ix++){
         for (int iz=izmin; iz<nc1; iz++){
 
@@ -1560,13 +1809,18 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IY(ny-1-iy)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 -= bnd_coef[iy] * in[2][IY(ny-1-iy)];
+            }
             iy=ny-1;
-            out[IY(iy)] = add*out[IY(iy)] - adh * (f1(par,IY(iy))*sumx/dx +f2(par,IY(iy))*sumz/dz + f3(par,IY(iy))*sumy/dy);
+            out[IY(iy)] = add*out[IY(iy)] - adh * (f1(par,IY(iy))*sumx/dx +f2(par,IY(iy))*sumz/dz +f3(par,IY(iy))*sumy0/dy + f4(par,IY(iy))*sumy/dy -f5(par,IY(iy))*in[3][IY(iy)]/dt);
         }
     }
 
     // back bottom middle
-    #pragma omp parallel for private(sumx,sumy,sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=ixminb; ix<ixmaxb; ix++){
         for (int iz=nz-izmax; iz<std::min(nc1,nz-izmin); iz++){
 
@@ -1583,13 +1837,18 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IXYZ(ix,ny-1-iy,nz-1-iz)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 -= bnd_coef[iy] * in[2][IXYZ(ix,ny-1-iy,nz-1-iz)];
+            }
             iy=ny-1;
-            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (f1(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx +f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz + f3(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy);
+            out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] - adh * (f1(par,IXYZ(ix,iy,nz-1-iz))*sumx/dx +f2(par,IXYZ(ix,iy,nz-1-iz))*sumz/dz +f3(par,IXYZ(ix,iy,nz-1-iz))*sumy0/dy + f4(par,IXYZ(ix,iy,nz-1-iz))*sumy/dy -f5(par,IXYZ(ix,iy,nz-1-iz))*in[3][IXYZ(ix,iy,nz-1-iz)]/dt);
         }
     }
 
     // back middle
-    #pragma omp parallel for private(sumx, sumy, sumz)
+    #pragma omp parallel for private(sumx,sumy,sumz,sumy0)
     for (int ix=ixminb; ix<ixmaxb; ix++){
         for (int iz=izminb; iz<izmaxb; iz++){
 
@@ -1603,8 +1862,13 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
             for (iy = 0; iy < 4; iy++){
                 sumy += scoef[iy] * in[2][IY(ny-1-iy)];
             }
+            // (Dy.in3)_0
+            sumy0 = 0;
+            for (iy = 0; iy < 6; iy++){
+                sumy0 -= bnd_coef[iy] * in[2][IY(ny-1-iy)];
+            }
             iy=ny-1;
-            out[IY(iy)] = add*out[IY(iy)] - adh * (f1(par,IY(iy))*sumx/dx +f2(par,IY(iy))*sumz/dz + f3(par,IY(iy))*sumy/dy);
+            out[IY(iy)] = add*out[IY(iy)] - adh * (f1(par,IY(iy))*sumx/dx +f2(par,IY(iy))*sumz/dz +f3(par,IY(iy))*sumy0/dy + f4(par,IY(iy))*sumy/dy -f5(par,IY(iy))*in[3][IY(iy)]/dt);
         }
     }
 }
