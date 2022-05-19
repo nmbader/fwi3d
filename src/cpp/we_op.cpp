@@ -697,23 +697,19 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
         esat_scale_boundaries(in, nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, 0, nz, mod, par.dt, par.bc_top==2, par.bc_bottom==2, par.bc_left==2, par.bc_right==2, par.bc_front==2, par.bc_back==2);
         
         // apply taper 
-        //taperz(curr[0], nx, nz, 0, nx, par.taper_top, 0, par.taper_strength);
-        //taperz(curr[0], nx, nz, 0, nx, nz-par.taper_bottom, nz, par.taper_strength);
-        //taperx(curr[0], nx, nz, 0, nz, par.taper_left, 0, par.taper_strength);
-        //taperx(curr[0], nx, nz, 0, nz, nx-par.taper_right, nx, par.taper_strength);
-        //taperz(curr[1], nx, nz, 0, nx, par.taper_top, 0, par.taper_strength);
-        //taperz(curr[1], nx, nz, 0, nx, nz-par.taper_bottom, nz, par.taper_strength);
-        //taperx(curr[1], nx, nz, 0, nz, par.taper_left, 0, par.taper_strength);
-        //taperx(curr[1], nx, nz, 0, nz, nx-par.taper_right, nx, par.taper_strength);
-        //taperz(next[0], nx, nz, 0, nx, par.taper_top, 0, par.taper_strength);
-        //taperz(next[0], nx, nz, 0, nx, nz-par.taper_bottom, nz, par.taper_strength);
-        //taperx(next[0], nx, nz, 0, nz, par.taper_left, 0, par.taper_strength);
-        //taperx(next[0], nx, nz, 0, nz, nx-par.taper_right, nx, par.taper_strength);
-        //taperz(next[1], nx, nz, 0, nx, par.taper_top, 0, par.taper_strength);
-        //taperz(next[1], nx, nz, 0, nx, nz-par.taper_bottom, nz, par.taper_strength);
-        //taperx(next[1], nx, nz, 0, nz, par.taper_left, 0, par.taper_strength);
-        //taperx(next[1], nx, nz, 0, nz, nx-par.taper_right, nx, par.taper_strength);
-
+        taperz(curr[0], nx, ny, nz, 3, 0, nx, 0, ny, par.taper_top, 0, 0, 3, par.taper_strength);
+        taperz(next[0], nx, ny, nz, 3, 0, nx, 0, ny, par.taper_top, 0, 0, 3, par.taper_strength);
+        taperz(curr[0], nx, ny, nz, 3, 0, nx, 0, ny, nz-par.taper_bottom, nz, 0, 3, par.taper_strength);
+        taperz(next[0], nx, ny, nz, 3, 0, nx, 0, ny, nz-par.taper_bottom, nz, 0, 3, par.taper_strength);
+        taperx(curr[0], nx, ny, nz, 3, par.taper_left, 0, 0, ny, 0, nz, 0, 3, par.taper_strength);
+        taperx(next[0], nx, ny, nz, 3, par.taper_left, 0, 0, ny, 0, nz, 0, 3, par.taper_strength);
+        taperx(curr[0], nx, ny, nz, 3, nx-par.taper_right, nx, 0, ny, 0, nz, 0, 3, par.taper_strength);
+        taperx(next[0], nx, ny, nz, 3, nx-par.taper_right, nx, 0, ny, 0, nz, 0, 3, par.taper_strength);
+        tapery(curr[0], nx, ny, nz, 3, 0, nx, par.taper_front, 0, 0, nz, 0, 3, par.taper_strength);
+        tapery(next[0], nx, ny, nz, 3, 0, nx, par.taper_front, 0, 0, nz, 0, 3, par.taper_strength);
+        tapery(curr[0], nx, ny, nz, 3, 0, nx, ny-par.taper_back, ny, 0, nz, 0, 3, par.taper_strength);
+        tapery(next[0], nx, ny, nz, 3, 0, nx, ny-par.taper_back, ny, 0, nz, 0, 3, par.taper_strength);
+       
         bucket=prev;
         prev=curr;
         curr=next;

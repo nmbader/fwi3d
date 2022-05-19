@@ -1099,12 +1099,102 @@ void esat_scale_boundaries(data_t** in, int nx, int ny, int nz, data_t dx, data_
 
 void taperz(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, int icmin, int icmax, data_t a){
 
+    data_t (* __restrict pin) [ny][nx][nz] = (data_t (*) [ny][nx][nz]) in;
+    data_t val=0;
+    if (izmax>izmin)
+    {
+        for (int ic=icmin; ic<icmax; ic++){
+            #pragma omp parallel for private(val)
+            for (int iy=iymin; iy<iymax; iy++){
+                for (int ix=ixmin; ix<ixmax; ix++){
+                    for (int iz=izmin; iz<izmax; iz++){
+                        val = cos(a*0.5*M_PI*(iz-izmin)/(izmax-izmin));
+                        pin[ic][iy][ix][iz] *= val*val;
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        for (int ic=icmin; ic<icmax; ic++){
+            #pragma omp parallel for private(val)
+            for (int iy=iymin; iy<iymax; iy++){
+                for (int ix=ixmin; ix<ixmax; ix++){
+                    for (int iz=izmax; iz<izmin; iz++){
+                        val = cos(a*0.5*M_PI*(iz+1-izmin)/(izmax-izmin));
+                        pin[ic][iy][ix][iz] *= val*val;
+                    }
+                }
+            }
+        }
+    }
 }
 void taperx(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, int icmin, int icmax, data_t a){
     
+    data_t (* __restrict pin) [ny][nx][nz] = (data_t (*) [ny][nx][nz]) in;
+    data_t val=0;
+    if (ixmax>ixmin)
+    {
+        for (int ic=icmin; ic<icmax; ic++){
+            #pragma omp parallel for private(val)
+            for (int iy=iymin; iy<iymax; iy++){
+                for (int ix=ixmin; ix<ixmax; ix++){
+                    val = cos(a*0.5*M_PI*(ix-ixmin)/(ixmax-ixmin));
+                    for (int iz=izmin; iz<izmax; iz++){
+                        pin[ic][iy][ix][iz] *= val*val;
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        for (int ic=icmin; ic<icmax; ic++){
+            #pragma omp parallel for private(val)
+            for (int iy=iymin; iy<iymax; iy++){
+                for (int ix=ixmax; ix<ixmin; ix++){
+                    val = cos(a*0.5*M_PI*(ix+1-ixmin)/(ixmax-ixmin));
+                    for (int iz=izmin; iz<izmax; iz++){
+                        pin[ic][iy][ix][iz] *= val*val;
+                    }
+                }
+            }
+        }
+    }
 }
 void tapery(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, int icmin, int icmax, data_t a){
     
+    data_t (* __restrict pin) [ny][nx][nz] = (data_t (*) [ny][nx][nz]) in;
+    data_t val=0;
+    if (iymax>iymin)
+    {
+        for (int ic=icmin; ic<icmax; ic++){
+            #pragma omp parallel for private(val)
+            for (int iy=iymin; iy<iymax; iy++){
+                val = cos(a*0.5*M_PI*(iy-iymin)/(iymax-iymin));
+                for (int ix=ixmin; ix<ixmax; ix++){
+                    for (int iz=izmin; iz<izmax; iz++){
+                        pin[ic][iy][ix][iz] *= val*val;
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        for (int ic=icmin; ic<icmax; ic++){
+            #pragma omp parallel for private(val)
+            for (int iy=iymax; iy<iymin; iy++){
+                val = cos(a*0.5*M_PI*(iy+1-iymin)/(iymax-iymin));
+                for (int ix=ixmin; ix<ixmax; ix++){
+                    for (int iz=izmin; iz<izmax; iz++){
+                        pin[ic][iy][ix][iz] *= val*val;
+                    }
+                }
+            }
+        }
+    }
 }
 
 #undef IZ

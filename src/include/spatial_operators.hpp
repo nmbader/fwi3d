@@ -29,9 +29,9 @@ void esat_scale_boundaries(data_t** in, int nx, int ny, int nz, data_t dx, data_
 
 // Apply cosine^2 taper to damp the wavefield (to use in conjunction with absorbing SAT)
 // taper = cos[a * pi/2 * (i - istart)/(iend-istart)]^2 ; 0 <= a <= 1
-void taperz(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, int icmin, int icmax, data_t a);
-void taperx(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, int icmin, int icmax, data_t a);
-void tapery(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, int icmin, int icmax, data_t a);
+void taperz(data_t* __restrict in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, int icmin, int icmax, data_t a);
+void taperx(data_t* __restrict in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, int icmin, int icmax, data_t a);
+void tapery(data_t* __restrict in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, int icmin, int icmax, data_t a);
 
 // second derivative operators with variable parameters, defined as template function to accomodate different expressions of parameters
 template<expr f>
