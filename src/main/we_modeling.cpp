@@ -73,10 +73,10 @@ int main(int argc, char **argv){
         if (verbose>1) fprintf(stderr,"Start processing shot %d by process %d\n",s, rank);
 
 // Build the appropriate wave equation operator
-        nl_we_op_e * op = new nl_we_op_e(*model->getHyper(),allsrc,s,par);;
+        nl_we_op_e * op;
         //if (par.nmodels==2) op=new nl_we_op_a(*model->getHyper(),allsrc,s,par);
-        //else if (par.nmodels==3) op=new nl_we_op_e(*model->getHyper(),allsrc,s,par);
-        //else if (par.nmodels==5) op=new nl_we_op_vti(*model->getHyper(),allsrc,s,par);
+        if (par.nmodels==3) op=new nl_we_op_e(*model->getHyper(),allsrc,s,par);
+        else if (par.nmodels==6) op=new nl_we_op_vti(*model->getHyper(),allsrc,s,par);
 
 // Run the forward modeling
         std::shared_ptr<vec> rcv = std::make_shared<vec> (*op->getRange());

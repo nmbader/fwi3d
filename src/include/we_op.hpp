@@ -164,6 +164,7 @@ public:
     void apply_forward(bool add, const data_t * pmod, data_t * pdat);
     void apply_adjoint(bool add, data_t * pmod, const data_t * pdat);
 };
+*/
 
 // non-linear VTI elastic wave equation operator: taking an elastic model and computing data
 class nl_we_op_vti : virtual public nl_we_op_e {
@@ -177,11 +178,13 @@ public:
         return op;
     }
     
-    // convert Vp, Vs, rho, delta, epsilon to generalized lambda, generalized mu, rho, c13, eps and vice versa
+    // convert Vp, Vs, rho, delta, epsilon, gamma to generalized lambda, generalized mu, rho, c13, eps, c66 and vice versa
     // c33 = lambda+2.mu
     // c11 = (1+2.eps).c33
     // c55 = mu
     // c13 = sqrt[2.c33.(c33-c55).del + (c33-c55)^2] - c55
+    // c66 = (1+2.gam).mu
+    // c12 = c11 - 2.c66
     // mu = rho.vs2
     // lambda = rho.(vp2 - 2.vs2)
     void convert_model(data_t * m, int n, bool forward) const;
@@ -194,6 +197,7 @@ public:
 
 };
 
+/*
 // linear isotropic elastic wave equation operator: taking a source function and computing data
 class l_we_op_vti : public l_we_op_e, public nl_we_op_vti {
     
