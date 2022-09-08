@@ -8,7 +8,7 @@ data_t getHcoef(data_t * coef, int size, int n, int i){
     else return 1;
 }
 
-void dipole_to_strain(bool adj, data_t * in, const data_t * dip, const data_t * az, int nrcv, int nt, int itrmin, int itrmax){
+void dipole_to_strain(bool adj, data_t * in, const data_t * dip, const data_t * az, int nrcv, int nt, int itrmin, int itrmax, data_t gl){
 
     data_t (* __restrict p) [nrcv][nt] = (data_t (*) [nrcv][nt]) in;
     if (!adj){
@@ -19,7 +19,7 @@ void dipole_to_strain(bool adj, data_t * in, const data_t * dip, const data_t * 
             data_t ca = cos(az[ix]);
             data_t sa = sin(az[ix]);
             for (int it=0; it<nt; it++){
-                p[0][ix][it] = cd*ca*p[0][ix][it] + cd*sa*p[1][ix][it] + sd*p[2][ix][it];
+                p[0][ix][it] = (cd*ca*p[0][ix][it] + cd*sa*p[1][ix][it] + sd*p[2][ix][it]) / gl;
                 p[1][ix][it] = 0;
                 p[2][ix][it] = 0;
             }
@@ -33,9 +33,9 @@ void dipole_to_strain(bool adj, data_t * in, const data_t * dip, const data_t * 
             data_t ca = cos(az[ix]);
             data_t sa = sin(az[ix]);
             for (int it=0; it<nt; it++){
-                p[2][ix][it] = sd*p[0][ix][it];
-                p[1][ix][it] = cd*sa*p[0][ix][it];
-                p[0][ix][it] *= cd*ca;
+                p[2][ix][it] = sd*p[0][ix][it] / gl;
+                p[1][ix][it] = cd*sa*p[0][ix][it] / gl;
+                p[0][ix][it] *= cd*ca / gl;
             }
         }
     }

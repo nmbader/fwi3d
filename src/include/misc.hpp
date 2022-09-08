@@ -15,11 +15,11 @@ inline void _successCheck(bool success, std::string file, int line, std::string 
 // the coefficients do not include the spatial sampling
 data_t getHcoef(data_t * coef, int size, int n, int i);
 
-// convert 3-components dipole data u(gl/2) - u(-gl/2) to strain. The strain is stored in the first component
+// convert 3-components dipole data u(gl/2) - u(-gl/2) to average strain. The strain is stored in the first component
 // the adjoint performs the opposite transformation
 // forward: xout = cos(dip).cos(az).xin + cos(dip).sin(az).yin + sin(dip).zin  ; yout=0 ; zout=0
 // adjoint: xout = cos(dip).cos(az).xin ; yout = cos(dip).sin(az).xin ; zout = sin(dip).xin
-void dipole_to_strain(bool adj, data_t * in, const data_t * dip, const data_t * az, int nrcv, int nt, int itrmin, int itrmax);
+void dipole_to_strain(bool adj, data_t * in, const data_t * dip, const data_t * az, int nrcv, int nt, int itrmin, int itrmax, data_t gl);
 
 // trapezoidal time quadrature operator Ht (or its inverse)
 void applyHt(bool inv, bool add, const data_t * in, data_t * __restrict out, int nx, int nt, data_t dt, int ixmin, int ixmax);

@@ -14,7 +14,7 @@ struct param{
     int sinc_half_length=11;
 
     // sources and receivers geometry
-    int ns=1, nr=1, nscomp=2, nrcomp=3;
+    int ns=1, nr=1, nscomp=3, nrcomp=3;
     data_t sx0=0, sy0=0, sz0=0, rx0=0, ry0=0, rz0=0, rdip0=0, raz0=0, sxinc=0, syinc=0, szinc=0, rxinc=0, ryinc=0, rzinc=0, rdipinc=0, razinc=0;
     std::string srcoord = "none";
     bool srcoord_from_file = false;
