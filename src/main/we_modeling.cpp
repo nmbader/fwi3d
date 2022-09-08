@@ -49,7 +49,6 @@ int main(int argc, char **argv){
     analyzeGeometry(*model->getHyper(),par, par.verbose>0);
     std::shared_ptr<vec> allsrc = analyzeWavelet(src, par, par.verbose>0);
     //analyzeModel(*allsrc->getHyper(),model,par);
-    //l_we_op_ae lop(*allsrc->getHyper(),model,par);
     //lop.dotProduct();
     
 // If more than one shot is modeled, don't save the wavefield
@@ -74,7 +73,7 @@ int main(int argc, char **argv){
 
 // Build the appropriate wave equation operator
         nl_we_op_e * op;
-        //if (par.nmodels==2) op=new nl_we_op_a(*model->getHyper(),allsrc,s,par);
+        if (par.nmodels==2) op=new nl_we_op_a(*model->getHyper(),allsrc,s,par);
         if (par.nmodels==3) op=new nl_we_op_e(*model->getHyper(),allsrc,s,par);
         else if (par.nmodels==6) op=new nl_we_op_vti(*model->getHyper(),allsrc,s,par);
 

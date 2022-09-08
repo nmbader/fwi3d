@@ -971,9 +971,9 @@ void nl_we_op_e::apply_jacobianT(bool add, data_t * pmod, const data_t * pmod0, 
     // apply H quadrature to final gradient
     for (int p=0; p<nm; p++)
     {
-        applyHx(false, false, pmod+p*nxyz, pmod+p*nxyz, nx, ny, nz, dx, 0, nx, 0, ny, 0, nz);
-        applyHy(false, false, pmod+p*nxyz, pmod+p*nxyz, nx, ny, nz, dy, 0, nx, 0, ny, 0, nz);
-        applyHz(false, false, pmod+p*nxyz, pmod+p*nxyz, nx, ny, nz, dz, 0, nx, 0, ny, 0, nz);
+        applyHx(false, false, pmod+p*nxyz, pmod+p*nxyz, X.n, Y.n, Z.n, X.d, 0, X.n, 0, Y.n, 0, Z.n);
+        applyHy(false, false, pmod+p*nxyz, pmod+p*nxyz, X.n, Y.n, Z.n, Y.d, 0, X.n, 0, Y.n, 0, Z.n);
+        applyHz(false, false, pmod+p*nxyz, pmod+p*nxyz, X.n, Y.n, Z.n, Z.d, 0, X.n, 0, Y.n, 0, Z.n);
     }
 
     // convert gradients from lambda, mu, rho to vp, vs, rho    or   from K, rho-1 to vp, rho
@@ -1456,6 +1456,7 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
         if ((grad != nullptr) && (it%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], tmp, grad, par, nx, ny, nz, it/par.sub, dx, dy, dz, par.sub*par.dt);
 
         // apply spatial SBP operators
+        // mu here designates the second model parameter, i.e. reciprocal of density 1/rho 
         Dxx_var<mu>(false, curr[0], next[0], nx, ny, nz, dx, 0, nx, 0, ny, 0, nz, mod, 1.0);
         Dyy_var<mu>(true, curr[0], next[0], nx, ny, nz, dy, 0, nx, 0, ny, 0, nz, mod, 1.0);
         Dzz_var<mu>(true, curr[0], next[0], nx, ny, nz, dz, 0, nx, 0, ny, 0, nz, mod, 1.0);
@@ -1464,76 +1465,86 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
         inj->inject(true, src, next[0], nx, ny, nz, par.nt, inj->_npts, 0, it, 0, inj->_npts, inj->_xind.data(), inj->_yind.data(), inj->_zind.data(), inj->_xw.data(), inj->_yw.data(), inj->_zw.data());
 
         // apply boundary conditions
-        /* if (par.bc_top==1)
+        if (par.bc_top==1)
         {
             const data_t * in[1] = {curr[0]};
-            asat_dirichlet_top(true, in, next[0], nx, nz, dx, dz, par.pml_L*l, nx-par.pml_R*l, mod, alpha);
+            asat_dirichlet_top(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod, alpha);
         }
-        else if (par.bc_top==2)
-        {
-            const data_t * in[2] = {curr[0],prev[0]};
-            asat_absorbing_top(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
-        }
-        else if (par.bc_top==3)
-        {
-            const data_t * in[1] = {curr[0]};
-            asat_neumann_top(true, in, next[0], nx, nz, dx, dz, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
-        }
-        else if (par.bc_top==4)
-        {
-            const data_t * in[2] = {curr[0],prev[0]};
-            asat_neumann_absorbing_top(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_L*l, nx-par.pml_R*l, mod, _transmission->getCVals());
-        }
-        else if (par.bc_top==5)
-        {
-            const data_t * in[1] = {curr[0]};
-            asat_neumann_dirichlet_top(true, in, next[0], nx, nz, dx, dz, par.pml_L*l, nx-par.pml_R*l, mod, alpha, _transmission->getCVals());
-        }
+        //else if (par.bc_top==2)
+        //{
+        //    const data_t * in[2] = {curr[0],prev[0]};
+        //    asat_absorbing_top(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
+        //}
+        //else if (par.bc_top==3)
+        //{
+        //    const data_t * in[1] = {curr[0]};
+        //    asat_neumann_top(true, in, next[0], nx, nz, dx, dz, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
+        //}
+        //else if (par.bc_top==4)
+        //{
+        //    const data_t * in[2] = {curr[0],prev[0]};
+        //    asat_neumann_absorbing_top(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_L*l, nx-par.pml_R*l, mod, _transmission->getCVals());
+        //}
+        //else if (par.bc_top==5)
+        //{
+        //    const data_t * in[1] = {curr[0]};
+        //    asat_neumann_dirichlet_top(true, in, next[0], nx, nz, dx, dz, par.pml_L*l, nx-par.pml_R*l, mod, alpha, _transmission->getCVals());
+        //}
         if (par.bc_bottom==1)
         {
             const data_t * in[1] = {curr[0]};
-            asat_dirichlet_bottom(true, in, next[0], nx, nz, dx, dz, par.pml_L*l, nx-par.pml_R*l, mod, alpha);
+            asat_dirichlet_bottom(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod, alpha);
         }
-        else if (par.bc_bottom==2)
-        {
-            const data_t * in[2] = {curr[0],prev[0]};
-            asat_absorbing_bottom(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
-        }
-        else if (par.bc_bottom==3)
-        {
-            const data_t * in[1] = {curr[0]};
-            asat_neumann_bottom(true, in, next[0], nx, nz, dx, dz, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
-        }
+        //else if (par.bc_bottom==2)
+        //{
+        //    const data_t * in[2] = {curr[0],prev[0]};
+        //    asat_absorbing_bottom(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
+        //}
+        //else if (par.bc_bottom==3)
+        //{
+        //    const data_t * in[1] = {curr[0]};
+        //    asat_neumann_bottom(true, in, next[0], nx, nz, dx, dz, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
+        //}
         if (par.bc_left==1)
         {
             const data_t * in[1] = {curr[0]};
-            asat_dirichlet_left(true, in, next[0], nx, nz, dx, dz, par.pml_T*l, nz-par.pml_B*l, mod, alpha);
+            asat_dirichlet_left(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod, alpha);
         }
-        else if (par.bc_left==2)
-        {
-            const data_t * in[2] = {curr[0],prev[0]};
-            asat_absorbing_left(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_T*l, nz-par.pml_B*l, mod, 1.0);
-        }
-        else if (par.bc_left==3)
-        {
-            const data_t * in[1] = {curr[0]};
-            asat_neumann_left(true, in, next[0], nx, nz, dx, dz, par.pml_T*l, nz-par.pml_B*l, mod, 1.0);
-        }
+        //else if (par.bc_left==2)
+        //{
+        //    const data_t * in[2] = {curr[0],prev[0]};
+        //    asat_absorbing_left(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_T*l, nz-par.pml_B*l, mod, 1.0);
+        //}
+        //else if (par.bc_left==3)
+        //{
+        //    const data_t * in[1] = {curr[0]};
+        //    asat_neumann_left(true, in, next[0], nx, nz, dx, dz, par.pml_T*l, nz-par.pml_B*l, mod, 1.0);
+        //}
         if (par.bc_right==1)
         {
             const data_t * in[1] = {curr[0]};
-            asat_dirichlet_right(true, in, next[0], nx, nz, dx, dz, par.pml_T*l, nz-par.pml_B*l, mod, alpha);
+            asat_dirichlet_right(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod, alpha);
         }
-        else if (par.bc_right==2)
-        {
-            const data_t * in[2] = {curr[0],prev[0]};
-            asat_absorbing_right(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_T*l, nz-par.pml_B*l, mod, 1.0);
-        }
-        else if (par.bc_right==3)
+        //else if (par.bc_right==2)
+        //{
+        //    const data_t * in[2] = {curr[0],prev[0]};
+        //    asat_absorbing_right(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_T*l, nz-par.pml_B*l, mod, 1.0);
+        //}
+        //else if (par.bc_right==3)
+        //{
+        //    const data_t * in[1] = {curr[0]};
+        //    asat_neumann_right(true, in, next[0], nx, nz, dx, dz, par.pml_T*l, nz-par.pml_B*l, mod, 1.0);
+        //}
+        if (par.bc_front==1)
         {
             const data_t * in[1] = {curr[0]};
-            asat_neumann_right(true, in, next[0], nx, nz, dx, dz, par.pml_T*l, nz-par.pml_B*l, mod, 1.0);
-        } */
+            asat_dirichlet_front(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod, alpha);
+        }
+        if (par.bc_back==1)
+        {
+            const data_t * in[1] = {curr[0]};
+            asat_dirichlet_back(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod, alpha);
+        }
 
         // update wfld with the 2 steps time recursion
         #pragma omp parallel for
@@ -1547,18 +1558,18 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
         // if (par.bc_top!=4) asat_scale_boundaries(in, nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, 0, nz, mod, par.dt, par.bc_top==2, par.bc_bottom==2, par.bc_left==2, par.bc_right==2);
         // else asat_scale_boundaries_bis(in, nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, 0, nz, mod, _transmission->getCVals(), par.dt, par.bc_top==4, par.bc_bottom==2, par.bc_left==2, par.bc_right==2);
         
-        taperz(curr[0], nx, ny, nz, 3, 0, nx, 0, ny, par.taper_top, 0, 0, 3, par.taper_strength);
-        taperz(next[0], nx, ny, nz, 3, 0, nx, 0, ny, par.taper_top, 0, 0, 3, par.taper_strength);
-        taperz(curr[0], nx, ny, nz, 1, 0, nx, 0, ny, nz-par.taper_bottom, nz, 0, 3, par.taper_strength);
-        taperz(next[0], nx, ny, nz, 1, 0, nx, 0, ny, nz-par.taper_bottom, nz, 0, 3, par.taper_strength);
-        taperx(curr[0], nx, ny, nz, 1, par.taper_left, 0, 0, ny, 0, nz, 0, 3, par.taper_strength);
-        taperx(next[0], nx, ny, nz, 1, par.taper_left, 0, 0, ny, 0, nz, 0, 3, par.taper_strength);
-        taperx(curr[0], nx, ny, nz, 1, nx-par.taper_right, nx, 0, ny, 0, nz, 0, 3, par.taper_strength);
-        taperx(next[0], nx, ny, nz, 1, nx-par.taper_right, nx, 0, ny, 0, nz, 0, 3, par.taper_strength);
-        tapery(curr[0], nx, ny, nz, 1, 0, nx, par.taper_front, 0, 0, nz, 0, 3, par.taper_strength);
-        tapery(next[0], nx, ny, nz, 1, 0, nx, par.taper_front, 0, 0, nz, 0, 3, par.taper_strength);
-        tapery(curr[0], nx, ny, nz, 1, 0, nx, ny-par.taper_back, ny, 0, nz, 0, 3, par.taper_strength);
-        tapery(next[0], nx, ny, nz, 1, 0, nx, ny-par.taper_back, ny, 0, nz, 0, 3, par.taper_strength);
+        taperz(curr[0], nx, ny, nz, 1, 0, nx, 0, ny, par.taper_top, 0, 0, 1, par.taper_strength);
+        taperz(next[0], nx, ny, nz, 1, 0, nx, 0, ny, par.taper_top, 0, 0, 1, par.taper_strength);
+        taperz(curr[0], nx, ny, nz, 1, 0, nx, 0, ny, nz-par.taper_bottom, nz, 0, 1, par.taper_strength);
+        taperz(next[0], nx, ny, nz, 1, 0, nx, 0, ny, nz-par.taper_bottom, nz, 0, 1, par.taper_strength);
+        taperx(curr[0], nx, ny, nz, 1, par.taper_left, 0, 0, ny, 0, nz, 0, 1, par.taper_strength);
+        taperx(next[0], nx, ny, nz, 1, par.taper_left, 0, 0, ny, 0, nz, 0, 1, par.taper_strength);
+        taperx(curr[0], nx, ny, nz, 1, nx-par.taper_right, nx, 0, ny, 0, nz, 0, 1, par.taper_strength);
+        taperx(next[0], nx, ny, nz, 1, nx-par.taper_right, nx, 0, ny, 0, nz, 0, 1, par.taper_strength);
+        tapery(curr[0], nx, ny, nz, 1, 0, nx, par.taper_front, 0, 0, nz, 0, 1, par.taper_strength);
+        tapery(next[0], nx, ny, nz, 1, 0, nx, par.taper_front, 0, 0, nz, 0, 1, par.taper_strength);
+        tapery(curr[0], nx, ny, nz, 1, 0, nx, ny-par.taper_back, ny, 0, nz, 0, 1, par.taper_strength);
+        tapery(next[0], nx, ny, nz, 1, 0, nx, ny-par.taper_back, ny, 0, nz, 0, 1, par.taper_strength);
 
         bucket=prev;
         prev=curr;

@@ -2566,6 +2566,15 @@ void esat_scale_boundaries(data_t** in, int nx, int ny, int nz, data_t dx, data_
     in[2][IXYZ(0,ny-1,nz-1)] /= (1+psc[7][2]);
 }
 
+// SAT functions for the acoustic wave equation (variable density)
+void asat_dirichlet_top(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int iymin, int iymax, const data_t ** par, data_t a);
+void asat_dirichlet_bottom(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int iymin, int iymax, const data_t ** par, data_t a);
+void asat_dirichlet_left(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int iymin, int iymax, int izmin, int izmax, const data_t ** par, data_t a);
+void asat_dirichlet_right(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int iymin, int iymax, int izmin, int izmax, const data_t ** par, data_t a);
+void asat_dirichlet_front(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int izmin, int izmax, const data_t ** par, data_t a);
+void asat_dirichlet_back(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int izmin, int izmax, const data_t ** par, data_t a);
+
+
 #undef IZ
 #undef IX
 #undef IY

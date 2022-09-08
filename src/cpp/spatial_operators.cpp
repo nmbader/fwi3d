@@ -505,6 +505,123 @@ void tapery(data_t* in, int nx, int ny, int nz, int ncomp, int ixmin, int ixmax,
     }
 }
 
+void asat_dirichlet_top(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int iymin, int iymax, const data_t ** par, data_t a)
+{
+    data_t scoef[4] = {11.0/6, -3, 1.5, -1.0/3};
+    data_t hcoef[4] = {17.0/48, 59.0/48, 43.0/48, 49.0/48};
+    int nc1=4;
+    data_t d2=dz*dz;
+
+    // SAT = + H-1 (S'.(f2*in_0)) - H-1(f2*in_0/(h.a))_0  f2=reciprocal of density
+    // S is the boundary derivative operator pointing outwards
+
+    #pragma omp parallel for
+    for (int iy=iymin; iy<iymax; iy++){
+        for (int ix=ixmin; ix<ixmax; ix++){
+            for (int iz=0; iz<nc1; iz++){
+                out[IXYZ(ix,iy,iz)] = add*out[IXYZ(ix,iy,iz)] + 1.0/(hcoef[iz]*d2)*scoef[iz]*par[1][IXYZ(ix,iy,0)]*in[0][IXYZ(ix,iy,0)];
+            }
+            out[IXYZ(ix,iy,0)] -= par[1][IXYZ(ix,iy,0)]*in[0][IXYZ(ix,iy,0)]/(a*hcoef[0]*d2);
+        }
+    }
+}
+
+void asat_dirichlet_bottom(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int iymin, int iymax, const data_t ** par, data_t a)
+{
+    data_t scoef[4] = {11.0/6, -3, 1.5, -1.0/3};
+    data_t hcoef[4] = {17.0/48, 59.0/48, 43.0/48, 49.0/48};
+    int nc1=4;
+    data_t d2=dz*dz;
+
+    // SAT = + H-1 (S'.(f2*in_0)) - H-1(f2*in_0/(h.a))_0  f2=reciprocal of density
+    #pragma omp parallel for
+    for (int iy=iymin; iy<iymax; iy++){
+        for (int ix=ixmin; ix<ixmax; ix++){
+            for (int iz=0; iz<nc1; iz++){
+                out[IXYZ(ix,iy,nz-1-iz)] = add*out[IXYZ(ix,iy,nz-1-iz)] + 1.0/(hcoef[iz]*d2)*scoef[iz]*par[1][IXYZ(ix,iy,nz-1)]*in[0][IXYZ(ix,iy,nz-1)];
+            }
+            out[IXYZ(ix,iy,nz-1)] -= par[1][IXYZ(ix,iy,nz-1)]*in[0][IXYZ(ix,iy,nz-1)]/(a*hcoef[0]*d2);
+        }
+    }
+}
+
+void asat_dirichlet_left(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int iymin, int iymax, int izmin, int izmax, const data_t ** par, data_t a)
+{
+    data_t scoef[4] = {11.0/6, -3, 1.5, -1.0/3};
+    data_t hcoef[4] = {17.0/48, 59.0/48, 43.0/48, 49.0/48};
+    int nc1=4;
+    data_t d2=dx*dx;
+
+    // SAT = + H-1 (S'.(f2*in_0)) - H-1(f2*in_0/(h.a))_0  f2=reciprocal of density
+    #pragma omp parallel for
+    for (int iy=iymin; iy<iymax; iy++){
+        for (int iz=izmin; iz<izmax; iz++){
+            for (int ix=0; ix<nc1; ix++){
+                out[IXYZ(ix,iy,iz)] = add*out[IXYZ(ix,iy,iz)] + 1.0/(hcoef[ix]*d2)*scoef[ix]*par[1][IXYZ(0,iy,iz)]*in[0][IXYZ(0,iy,iz)];
+            }
+            out[IXYZ(0,iy,iz)] -= par[1][IXYZ(0,iy,iz)]*in[0][IXYZ(0,iy,iz)]/(a*hcoef[0]*d2);
+        }
+    }
+}
+
+void asat_dirichlet_right(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int iymin, int iymax, int izmin, int izmax, const data_t ** par, data_t a)
+{
+    data_t scoef[4] = {11.0/6, -3, 1.5, -1.0/3};
+    data_t hcoef[4] = {17.0/48, 59.0/48, 43.0/48, 49.0/48};
+    int nc1=4;
+    data_t d2=dx*dx;
+
+    // SAT = + H-1 (S'.(f2*in_0)) - H-1(f2*in_0/(h.a))_0  f2=reciprocal of density
+    #pragma omp parallel for
+    for (int iy=iymin; iy<iymax; iy++){
+        for (int iz=izmin; iz<izmax; iz++){
+            for (int ix=0; ix<nc1; ix++){
+                out[IXYZ(nx-1-ix,iy,iz)] = add*out[IXYZ(nx-1-ix,iy,iz)] + 1.0/(hcoef[ix]*d2)*scoef[ix]*par[1][IXYZ(nx-1,iy,iz)]*in[0][IXYZ(nx-1,iy,iz)];
+            }
+            out[IXYZ(nx-1,iy,iz)] -= par[1][IXYZ(nx-1,iy,iz)]*in[0][IXYZ(nx-1,iy,iz)]/(a*hcoef[0]*d2);
+        }
+    }
+}
+
+void asat_dirichlet_front(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int izmin, int izmax, const data_t ** par, data_t a)
+{
+    data_t scoef[4] = {11.0/6, -3, 1.5, -1.0/3};
+    data_t hcoef[4] = {17.0/48, 59.0/48, 43.0/48, 49.0/48};
+    int nc1=4;
+    data_t d2=dy*dy;
+
+    // SAT = + H-1 (S'.(f2*in_0)) - H-1(f2*in_0/(h.a))_0  f2=reciprocal of density
+    #pragma omp parallel for
+    for (int ix=ixmin; ix<ixmax; ix++){
+        for (int iz=izmin; iz<izmax; iz++){
+            for (int iy=0; iy<nc1; iy++){
+                out[IXYZ(ix,iy,iz)] = add*out[IXYZ(ix,iy,iz)] + 1.0/(hcoef[iy]*d2)*scoef[iy]*par[1][IXYZ(ix,0,iz)]*in[0][IXYZ(ix,0,iz)];
+            }
+            out[IXYZ(ix,0,iz)] -= par[1][IXYZ(ix,0,iz)]*in[0][IXYZ(ix,0,iz)]/(a*hcoef[0]*d2);
+        }
+    }
+}
+
+void asat_dirichlet_back(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int izmin, int izmax, const data_t ** par, data_t a)
+{
+    data_t scoef[4] = {11.0/6, -3, 1.5, -1.0/3};
+    data_t hcoef[4] = {17.0/48, 59.0/48, 43.0/48, 49.0/48};
+    int nc1=4;
+    data_t d2=dy*dy;
+
+    // SAT = + H-1 (S'.(f2*in_0)) - H-1(f2*in_0/(h.a))_0  f2=reciprocal of density
+    #pragma omp parallel for
+    for (int ix=ixmin; ix<ixmax; ix++){
+        for (int iz=izmin; iz<izmax; iz++){
+            for (int iy=0; iy<nc1; iy++){
+                out[IXYZ(ix,ny-1-iy,iz)] = add*out[IXYZ(ix,ny-1-iy,iz)] + 1.0/(hcoef[iy]*d2)*scoef[iy]*par[1][IXYZ(ix,ny-1,iz)]*in[0][IXYZ(ix,ny-1,iz)];
+            }
+            out[IXYZ(ix,ny-1,iz)] -= par[1][IXYZ(ix,ny-1,iz)]*in[0][IXYZ(ix,ny-1,iz)]/(a*hcoef[0]*d2);
+        }
+    }
+}
+
+
 #undef IZ
 #undef IX
 #undef IY
