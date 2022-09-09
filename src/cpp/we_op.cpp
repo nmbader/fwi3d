@@ -456,7 +456,7 @@ static inline data_t eps2(const data_t ** par, int i){return 1+2*par[4][i];} // 
 
 void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, const data_t * curr, const data_t * u_x,  const data_t * u_y, const data_t * u_z, data_t * tmp, data_t * grad, const param &par, int nx, int ny, int nz, int it, data_t dx, data_t dy, data_t dz, data_t dt) const
 {
-    // Grad_lambda for wide stencil = div(adjoint).H.Ht.div(forward) = (adjointx_x + adjointz_z).H.Ht.(forwardx_x + forwardz_z)
+    // Grad_lambda for wide stencil = div(adjoint).H.Ht.div(forward)
     // Grad_mu for wide stencil = (adjointx_z+adjointz_x).H.Ht.(forwardx_z+forwardz_x)
     //      + (adjointx_y+adjointy_x).H.Ht.(forwardx_y+forwardy_x)
     //      + (adjointy_z+adjointz_y).H.Ht.(forwardy_z+forwardz_y)
@@ -465,7 +465,7 @@ void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, 
     // The H quadrature will be applied elsewhere to the final gradients (all shots included)
 
     int nxyz = nx*ny*nz;
-    int itlocal = par.nt/par.sub+1-it-1;
+    int itlocal = par.nt/par.sub-it;
     data_t (* __restrict pm) [nxyz] = (data_t (*)[nxyz]) model;
     data_t (* __restrict pfor) [3][nxyz] = (data_t (*) [3][nxyz]) u_full;
     data_t (* __restrict padj) [nxyz] = (data_t (*)[nxyz]) curr;
@@ -486,7 +486,7 @@ void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, 
     Dz(false, pfor[itlocal][1], temp[8], nx, ny, nz, dz, 0, nx, 0, ny, 0, nz); // forwardy_z
 
     // different from time zero
-    if (par.nt/par.sub-it>0){
+    if (itlocal>0){
         #pragma omp parallel for
         for (int i=0; i<nxyz; i++) 
         {
@@ -510,9 +510,9 @@ void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, 
                             + (padj_y[0][i] + padj_x[1][i])*(temp[5][i] + temp[6][i])
                             + (padj_z[1][i] + padj_y[2][i])*(temp[7][i] + temp[8][i])
                             + 2*padj_x[0][i]*temp[0][i] + 2*padj_y[1][i]*temp[1][i] + 2*padj_z[2][i]*temp[2][i]); // mu gradient
-            g[2][i] += 1.0/dt*(padj[0][i]*(pfor[itlocal+1][0][i]-2*pfor[itlocal][0][i]+pfor[itlocal-1][0][i]) 
-                            + padj[1][i]*(pfor[itlocal+1][1][i]-2*pfor[itlocal][1][i]+pfor[itlocal-1][1][i])
-                            + padj[2][i]*(pfor[itlocal+1][2][i]-2*pfor[itlocal][2][i]+pfor[itlocal-1][2][i]) ); // rho gradient
+            g[2][i] += 1.0/dt*( padj[0][i]*(pfor[itlocal+1][0][i]-pfor[itlocal][0][i]) 
+                                + padj[1][i]*(pfor[itlocal+1][1][i]-pfor[itlocal][1][i])
+                                + padj[2][i]*(pfor[itlocal+1][2][i]-pfor[itlocal][2][i]) ); // rho gradient
         }
     }
 }
@@ -1047,10 +1047,84 @@ void nl_we_op_vti::convert_model(data_t * m, int n, bool forward) const
 
 void nl_we_op_vti::compute_gradients(const data_t * model, const data_t * u_full, const data_t * curr, const data_t * u_x,  const data_t * u_y, const data_t * u_z, data_t * tmp, data_t * grad, const param &par, int nx, int ny, int nz, int it, data_t dx, data_t dy, data_t dz, data_t dt) const
 {
-    // Grad_lambda for wide stencil = div(adjoint).H.Ht.div(forward) = (adjointx_x + adjointz_z).H.Ht.(forwardx_x + forwardz_z)
-    // Grad_mu for wide stencil = (adjointx_z+adjointz_x).H.Ht.(forwardx_z+forwardz_x) + 2.adjointx_x.H.Ht.forwardx_x + 2.adjointz_z.H.Ht.forwardz_z
-    // Grad_rho = adjointx.H.Ht.forwardx_tt + adjointz.H.Ht.forwardz_tt
+    // see notes for gradients expression
     // The H quadrature will be applied elsewhere to the final gradients (all shots included)
+
+    int nxyz = nx*ny*nz;
+    int itlocal = par.nt/par.sub-it;
+    data_t (* __restrict pm) [nxyz] = (data_t (*)[nxyz]) model;
+    data_t (* __restrict pfor) [3][nxyz] = (data_t (*) [3][nxyz]) u_full;
+    data_t (* __restrict padj) [nxyz] = (data_t (*)[nxyz]) curr;
+    data_t (* __restrict padj_x) [nxyz] = (data_t (*)[nxyz]) u_x;
+    data_t (* __restrict padj_y) [nxyz] = (data_t (*)[nxyz]) u_y;
+    data_t (* __restrict padj_z) [nxyz] = (data_t (*)[nxyz]) u_z;
+    data_t (* __restrict temp) [nxyz] = (data_t (*)[nxyz]) tmp;
+    data_t (* __restrict g) [nxyz] = (data_t (*)[nxyz]) grad;
+
+    Dx(false, pfor[itlocal][0], temp[0], nx, ny, nz, dx, 0, nx, 0, ny, 0, nz); // forwardx_x
+    Dy(false, pfor[itlocal][1], temp[1], nx, ny, nz, dy, 0, nx, 0, ny, 0, nz); // forwardy_y
+    Dz(false, pfor[itlocal][2], temp[2], nx, ny, nz, dz, 0, nx, 0, ny, 0, nz); // forwardz_z
+    Dx(false, pfor[itlocal][2], temp[3], nx, ny, nz, dx, 0, nx, 0, ny, 0, nz); // forwardz_x
+    Dz(false, pfor[itlocal][0], temp[4], nx, ny, nz, dz, 0, nx, 0, ny, 0, nz); // forwardx_z
+    Dx(false, pfor[itlocal][1], temp[5], nx, ny, nz, dx, 0, nx, 0, ny, 0, nz); // forwardy_x
+    Dy(false, pfor[itlocal][0], temp[6], nx, ny, nz, dy, 0, nx, 0, ny, 0, nz); // forwardx_y
+    Dy(false, pfor[itlocal][2], temp[7], nx, ny, nz, dy, 0, nx, 0, ny, 0, nz); // forwardz_y
+    Dz(false, pfor[itlocal][1], temp[8], nx, ny, nz, dz, 0, nx, 0, ny, 0, nz); // forwardy_z
+
+    data_t val1=0, val2=0, val3=0, val4=0, del=0, gamma=0;
+
+    // different from time zero
+    if (itlocal>0){
+        #pragma omp parallel for private(val1,val2,val3,val4,del,gamma)
+        for (int i=0; i<nxyz; i++) 
+        {
+            del = ((pm[3][i]+pm[1][i])*(pm[3][i]+pm[1][i]) - (pm[0][i]+pm[1][i])*(pm[0][i]+pm[1][i])) / (2*(pm[0][i]+pm[1][i])*(pm[0][i]+2*pm[1][i]));((pm[3][i]+pm[1][i])*(pm[3][i]+pm[1][i]) - (pm[0][i]+pm[1][i])*(pm[0][i]+pm[1][i])) / (2*(pm[0][i]+pm[1][i])*(pm[0][i]+2*pm[1][i]));
+            gamma = (pm[5][i] - pm[1][i]) / (2*pm[1][i]);
+            val1 = sqrt(2*(pm[0][i]+2*pm[1][i])*(pm[0][i]+pm[1][i])*del + (pm[0][i]+pm[1][i])*(pm[0][i]+pm[1][i]));
+            val2 = ((1+2*del)*pm[0][i] + (1+3*del)*pm[1][i])/val1; // d(C13)/d(lambda)
+            val3 = ((1+3*del)*pm[0][i] + (1+4*del)*pm[1][i])/val1 - 1; // d(C13)/d(mu)
+            val4 = (padj_x[0][i] + padj_y[1][i])*temp[2][i] + padj_z[2][i]*(temp[0][i] + temp[1][i]);
+
+            g[0][i] += dt*( (1+2*pm[4][i])*(padj_x[0][i] + padj_y[1][i])*(temp[0][i] + temp[1][i])
+                            + padj_z[2][i]*temp[2][i] + val2*val4 ); // lambda gradient
+            g[1][i] += dt*( 2*(1+2*pm[4][i])*(padj_x[0][i]*temp[0][i] + padj_y[1][i]*temp[1][i])
+                            + 2*padj_z[2][i]*temp[2][i]
+                            + 4*(pm[4][i] - gamma)*(padj_x[0][i]*temp[1][i] + padj_x[0][i]*temp[0][i])
+                            + (padj_y[2][i] + padj_z[1][i])*(temp[7][i] + temp[8][i])
+                            + (padj_x[2][i] + padj_z[0][i])*(temp[3][i] + temp[4][i])
+                            + (1+2*gamma)*(padj_x[1][i] + padj_y[0][i])*(temp[5][i] + temp[6][i])
+                            + val3*val4 ); // mu gradient
+            g[2][i] += 1.0/dt*(padj[0][i]*(pfor[itlocal+1][0][i]-2*pfor[itlocal][0][i]+pfor[itlocal-1][0][i]) 
+                            + padj[1][i]*(pfor[itlocal+1][1][i]-2*pfor[itlocal][1][i]+pfor[itlocal-1][1][i])
+                            + padj[2][i]*(pfor[itlocal+1][2][i]-2*pfor[itlocal][2][i]+pfor[itlocal-1][2][i]) ); // rho gradient
+        }
+    }
+    // time zero
+    else{
+        #pragma omp parallel for private(val1,val2,val3,val4,del,gamma)
+        for (int i=0; i<nxyz; i++) 
+        {
+            del = ((pm[3][i]+pm[1][i])*(pm[3][i]+pm[1][i]) - (pm[0][i]+pm[1][i])*(pm[0][i]+pm[1][i])) / (2*(pm[0][i]+pm[1][i])*(pm[0][i]+2*pm[1][i]));((pm[3][i]+pm[1][i])*(pm[3][i]+pm[1][i]) - (pm[0][i]+pm[1][i])*(pm[0][i]+pm[1][i])) / (2*(pm[0][i]+pm[1][i])*(pm[0][i]+2*pm[1][i]));
+            gamma = (pm[5][i] - pm[1][i]) / (2*pm[1][i]);
+            val1 = sqrt(2*(pm[0][i]+2*pm[1][i])*(pm[0][i]+pm[1][i])*del + (pm[0][i]+pm[1][i])*(pm[0][i]+pm[1][i]));
+            val2 = ((1+2*del)*pm[0][i] + (1+3*del)*pm[1][i])/val1; // d(C13)/d(lambda)
+            val3 = ((1+3*del)*pm[0][i] + (1+4*del)*pm[1][i])/val1 - 1; // d(C13)/d(mu)
+            val4 = (padj_x[0][i] + padj_y[1][i])*temp[2][i] + padj_z[2][i]*(temp[0][i] + temp[1][i]);
+
+            g[0][i] += 0.5*dt*( (1+2*pm[4][i])*(padj_x[0][i] + padj_y[1][i])*(temp[0][i] + temp[1][i])
+                            + padj_z[2][i]*temp[2][i] + val2*val4 ); // lambda gradient
+            g[1][i] += 0.5*dt*( 2*(1+2*pm[4][i])*(padj_x[0][i]*temp[0][i] + padj_y[1][i]*temp[1][i])
+                            + 2*padj_z[2][i]*temp[2][i]
+                            + 4*(pm[4][i] - gamma)*(padj_x[0][i]*temp[1][i] + padj_x[0][i]*temp[0][i])
+                            + (padj_y[2][i] + padj_z[1][i])*(temp[7][i] + temp[8][i])
+                            + (padj_x[2][i] + padj_z[0][i])*(temp[3][i] + temp[4][i])
+                            + (1+2*gamma)*(padj_x[1][i] + padj_y[0][i])*(temp[5][i] + temp[6][i])
+                            + val3*val4 ); // mu gradient
+            g[2][i] += 1.0/dt*( padj[0][i]*(pfor[itlocal+1][0][i]-pfor[itlocal][0][i]) 
+                                + padj[1][i]*(pfor[itlocal+1][1][i]-pfor[itlocal][1][i])
+                                + padj[2][i]*(pfor[itlocal+1][2][i]-pfor[itlocal][2][i]) ); // rho gradient
+        }
+    }
 }
 
 void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src, data_t * rcv, const injector * inj, const injector * ext, data_t * full_wfld, data_t * grad, const param &par, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t ox, data_t oy, data_t oz) const
