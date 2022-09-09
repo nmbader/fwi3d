@@ -621,6 +621,459 @@ void asat_dirichlet_back(bool add, const data_t** in, __restrict data_t* out, in
     }
 }
 
+void asat_scale_boundaries(data_t** in, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, const data_t** par, data_t dt, bool top, bool bottom, bool left, bool right, bool front, bool back)
+{
+    // par must at least contain K, 1/rho in that order
+    data_t h0 = 17.0/48;
+    data_t scaler; // scaler for faces without the corners
+    std::vector<data_t> sc(8,0); // scalers for the corners: top front left,right, top back right, left, bottom front left, right, bottom back right, left
+    data_t * psc = sc.data();
+
+    // scale the top boundary without the corners
+    if (top){
+        psc[0] += sqrt(par[0][0]*par[1][0])*dt / (2  * dz * h0); // top front left
+        psc[1] += sqrt(par[0][IXYZ(nx-1,0,0)]*par[1][IXYZ(nx-1,0,0)])*dt / (2  * dz * h0); // top front right
+        psc[2] += sqrt(par[0][IXYZ(nx-1,ny-1,0)]*par[1][IXYZ(nx-1,ny-1,0)])*dt / (2  * dz * h0); // top back right
+        psc[3] += sqrt(par[0][IXYZ(0,ny-1,0)]*par[1][IXYZ(0,ny-1,0)])*dt / (2  * dz * h0); // top back left
+        if (izmin==0){
+            int iz=0;
+            #pragma omp parallel for private(scaler)
+            for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dz * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            // treat the edges without the corners
+            if (left){
+                int ix=0;
+                #pragma omp parallel for private(scaler)
+                for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt*(dx+dz) / (2 * dx*dz * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+            else{
+                int ix=0;
+                #pragma omp parallel for private(scaler)
+                for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dz * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (right){
+                int ix=nx-1;
+                #pragma omp parallel for private(scaler)
+                for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt*(dx+dz) / (2 * dx*dz * h0) ;
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+            else{
+                int ix=nx-1;
+                #pragma omp parallel for private(scaler)
+                for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dz * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (front){
+                int iy=0;
+                #pragma omp parallel for private(scaler)
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt*(dy+dz) / (2 * dy*dz * h0) ;
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+            else{
+                int iy=0;
+                #pragma omp parallel for private(scaler)
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dz * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (back){
+                int iy=ny-1;
+                #pragma omp parallel for private(scaler)
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt*(dy+dz) / (2 * dy*dz * h0) ;
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+            else{
+                int iy=ny-1;
+                #pragma omp parallel for private(scaler)
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dz * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+        }
+    }
+
+    // scale the bottom boundary without the corners
+    if (bottom){
+        psc[4] += sqrt(par[0][nz-1]*par[1][nz-1])*dt / (2  * dz * h0); // bottom front left
+        psc[5] += sqrt(par[0][IXYZ(nx-1,0,nz-1)]*par[1][IXYZ(nx-1,0,nz-1)])*dt / (2  * dz * h0); // bottom front left
+        psc[6] += sqrt(par[0][IXYZ(nx-1,ny-1,nz-1)]*par[1][IXYZ(nx-1,ny-1,nz-1)])*dt / (2  * dz * h0); // bottom back right
+        psc[7] += sqrt(par[0][IXYZ(0,ny-1,nz-1)]*par[1][IXYZ(0,ny-1,nz-1)])*dt / (2  * dz * h0); // bottom back left
+        if (izmax==nz){
+            int iz=nz-1;
+            #pragma omp parallel for private(scaler)
+            for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dz * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            // treat the edges without the corners
+            if (left){
+                int ix=0;
+                #pragma omp parallel for private(scaler)
+                for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt*(dx+dz) / (2 * dx*dz * h0) ;
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+            else{
+                int ix=0;
+                #pragma omp parallel for private(scaler)
+                for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dz * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (right){
+                int ix=nx-1;
+                #pragma omp parallel for private(scaler)
+                for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt*(dx+dz) / (2 * dx*dz * h0) ;
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+            else{
+                int ix=nx-1;
+                #pragma omp parallel for private(scaler)
+                for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dz * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (front){
+                int iy=0;
+                #pragma omp parallel for private(scaler)
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt*(dy+dz) / (2 * dy*dz * h0) ;
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+            else{
+                int iy=0;
+                #pragma omp parallel for private(scaler)
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dz * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (back){
+                int iy=ny-1;
+                #pragma omp parallel for private(scaler)
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt*(dy+dz) / (2 * dy*dz * h0) ;
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+            else{
+                int iy=ny-1;
+                #pragma omp parallel for private(scaler)
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dz * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+        }
+    }
+
+    // scale the left boundary without the corners
+    if (left){
+        psc[0] += sqrt(par[0][0]*par[1][0])*dt / (2 * dx * h0); // left front top
+        psc[3] += sqrt(par[0][IXYZ(0,ny-1,0)]*par[1][IXYZ(0,ny-1,0)])*dt / (2 * dx * h0); // left back top
+        psc[7] += sqrt(par[0][IXYZ(0,ny-1,nz-1)]*par[1][IXYZ(0,ny-1,nz-1)])*dt / (2 * dx * h0); // left back bottom
+        psc[4] += sqrt(par[0][IXYZ(0,0,nz-1)]*par[1][IXYZ(0,0,nz-1)])*dt / (2 * dx * h0); // left front bottom
+        if (ixmin==0){
+            int ix=0;
+            #pragma omp parallel for private(scaler)
+            for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            // treat the edges without the corners
+            if (!top){
+                int iz=0;
+                #pragma omp parallel for private(scaler)
+                for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (!bottom){
+                int iz=nz-1;
+                #pragma omp parallel for private(scaler)
+                for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (front){
+                int iy=0;
+                #pragma omp parallel for private(scaler)
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt*(dx+dy) / (2 * dx*dy * h0) ;
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+            else{
+                int iy=0;
+                #pragma omp parallel for private(scaler)
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (back){
+                int iy=ny-1;
+                #pragma omp parallel for private(scaler)
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt*(dx+dy) / (2 * dx*dy * h0) ;
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+            else{
+                int iy=ny-1;
+                #pragma omp parallel for private(scaler)
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+        }
+    }
+
+    // scale the right boundary without the corners
+    if (right){
+        psc[1] += sqrt(par[0][IXYZ(nx-1,0,0)]*par[1][IXYZ(nx-1,0,0)])*dt / (2 * dx * h0); // right front top
+        psc[2] += sqrt(par[0][IXYZ(nx-1,ny-1,0)]*par[1][IXYZ(nx-1,ny-1,0)])*dt / (2 * dx * h0); // right back top
+        psc[6] += sqrt(par[0][IXYZ(nx-1,ny-1,nz-1)]*par[1][IXYZ(nx-1,ny-1,nz-1)])*dt / (2 * dx * h0); // right back bottom
+        psc[5] += sqrt(par[0][IXYZ(nx-1,0,nz-1)]*par[1][IXYZ(nx-1,0,nz-1)])*dt / (2 * dx * h0); // right front bottom
+        
+        if (ixmax==nx){
+            int ix=nx-1;
+            #pragma omp parallel for private(scaler)
+            for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            // treat the edges without the corners
+            if (!top){
+                int iz=0;
+                #pragma omp parallel for private(scaler)
+                for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (!bottom){
+                int iz=nz-1;
+                #pragma omp parallel for private(scaler)
+                for (int iy = std::max(1,iymin); iy < std::min(ny-1,iymax); iy++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (front){
+                int iy=0;
+                #pragma omp parallel for private(scaler)
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt*(dx+dy) / (2 * dx*dy * h0) ;
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+            else{
+                int iy=0;
+                #pragma omp parallel for private(scaler)
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (back){
+                int iy=ny-1;
+                #pragma omp parallel for private(scaler)
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt*(dx+dy) / (2 * dx*dy * h0) ;
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+            else{
+                int iy=ny-1;
+                #pragma omp parallel for private(scaler)
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+        }
+    }
+
+    // scale the front boundary without the corners
+    if (front){
+        psc[0] += sqrt(par[0][0]*par[1][0])*dt / (2 * dy * h0); // front left top
+        psc[1] += sqrt(par[0][IXYZ(nx-1,0,0)]*par[1][IXYZ(nx-1,0,0)])*dt / (2 * dy * h0); // front right top
+        psc[5] += sqrt(par[0][IXYZ(nx-1,0,nz-1)]*par[1][IXYZ(nx-1,0,nz-1)])*dt / (2 * dy * h0); // front right bottom
+        psc[4] += sqrt(par[0][IXYZ(0,0,nz-1)]*par[1][IXYZ(0,0,nz-1)])*dt / (2 * dy * h0); // front left bottom
+        if (iymin==0){
+            int iy=0;
+            #pragma omp parallel for private(scaler)
+            for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            // treat the edges without the corners
+            if (!top){
+                int iz=0;
+                #pragma omp parallel for private(scaler)
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dy* h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (!bottom){
+                int iz=nz-1;
+                #pragma omp parallel for private(scaler)
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dy* h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (!left){
+                int ix=0;
+                #pragma omp parallel for private(scaler)
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dy* h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (!right){
+                int ix=nx-1;
+                #pragma omp parallel for private(scaler)
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dy* h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+        }
+    }
+
+    // scale the back boundary without the corners
+    if (back){
+        psc[3] += sqrt(par[0][IXYZ(0,ny-1,0)]*par[1][IXYZ(0,ny-1,0)])*dt / (2 * dy * h0); // back left top
+        psc[2] += sqrt(par[0][IXYZ(nx-1,ny-1,0)]*par[1][IXYZ(nx-1,ny-1,0)])*dt / (2 * dy * h0); // back right top
+        psc[6] += sqrt(par[0][IXYZ(nx-1,ny-1,nz-1)]*par[1][IXYZ(nx-1,ny-1,nz-1)])*dt / (2 * dy * h0); // back right bottom
+        psc[7] += sqrt(par[0][IXYZ(0,ny-1,nz-1)]*par[1][IXYZ(0,ny-1,nz-1)])*dt / (2 * dy * h0); // back left bottom
+        if (iymax==ny){
+            int iy=ny-1;
+            #pragma omp parallel for private(scaler)
+            for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            // treat the edges without the corners
+            if (!top){
+                int iz=0;
+                #pragma omp parallel for private(scaler)
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dy* h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (!bottom){
+                int iz=nz-1;
+                #pragma omp parallel for private(scaler)
+                for (int ix = std::max(1,ixmin); ix < std::min(nx-1,ixmax); ix++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dy* h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (!left){
+                int ix=0;
+                #pragma omp parallel for private(scaler)
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dy* h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+
+            if (!right){
+                int ix=nx-1;
+                #pragma omp parallel for private(scaler)
+                for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
+                    scaler = sqrt(par[0][IXYZ(ix,iy,iz)]*par[1][IXYZ(ix,iy,iz)])*dt / (2 * dy* h0);
+                    in[0][IXYZ(ix,iy,iz)] /= (1+scaler);
+                }
+            }
+        }
+    }
+
+    // scale the 8 corners
+    // top front left
+    in[0][IXYZ(0,0,0)] /= (1+psc[0]);
+    // top front right
+    in[0][IXYZ(nx-1,0,0)] /= (1+psc[1]);
+    // top back right
+    in[0][IXYZ(nx-1,ny-1,0)] /= (1+psc[2]);
+    // top back left
+    in[0][IXYZ(0,ny-1,0)] /= (1+psc[3]);
+    // bottom front left
+    in[0][IXYZ(0,0,nz-1)] /= (1+psc[4]);
+    // bottom front right
+    in[0][IXYZ(nx-1,0,nz-1)] /= (1+psc[5]);
+    // bottom back right
+    in[0][IXYZ(nx-1,ny-1,nz-1)] /= (1+psc[6]);
+    // bottom back left
+    in[0][IXYZ(0,ny-1,nz-1)] /= (1+psc[7]);
+}
 
 #undef IZ
 #undef IX

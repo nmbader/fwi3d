@@ -40,7 +40,7 @@ void analyzeGeometry(const hypercube<data_t> &model, param &par, bool verbose)
     par.bc_right = std::max(0, par.bc_right);
     par.bc_front = std::max(0, par.bc_front);
     par.bc_back = std::max(0, par.bc_back);
-    std::string bc[6] = {"none","free surface","locally absorbing","rigid-wall","mixed rigid-absorbing","mixed rigid-free"};
+    std::string bc[5] = {"none","free surface","locally absorbing","rigid-wall","mixed rigid-absorbing"};
     if (verbose){
         fprintf(stderr,"Top boundary condition = %s\t taper size = %d\n",bc[par.bc_top].c_str(), par.taper_top); 
         fprintf(stderr,"Bottom boundary condition = %s\t taper size = %d\n",bc[par.bc_bottom].c_str(), par.taper_bottom);
@@ -451,6 +451,7 @@ static inline data_t c12(const data_t ** par, int i){return (1+2*par[4][i])*(par
 static inline data_t simp(const data_t ** par, int i){return 0.5*sqrt(par[1][i]*par[2][i]);} // e.g. = 1/2 sqrt(rho.mu)
 static inline data_t pimp(const data_t ** par, int i){return 0.5*sqrt((par[0][i]+2*par[1][i])*par[2][i]);} // e.g. = 1/2 sqrt(rho.(lambda+2 mu))
 static inline data_t pimp2(const data_t ** par, int i){return 0.5*sqrt((1+2*par[4][i])*(par[0][i]+2*par[1][i])*par[2][i]);} // e.g. = 1/2 sqrt(rho.(1+2.eps).(lambda+2 mu))
+static inline data_t aimp(const data_t ** par, int i){return 0.5/sqrt(par[0][i]/par[1][i]);} // e.g. = 1/(2.sqrt(rho.K))
 static inline data_t eps2(const data_t ** par, int i){return 1+2*par[4][i];} // e.g. = 1+2.eps
 
 void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, const data_t * curr, const data_t * u_x,  const data_t * u_y, const data_t * u_z, data_t * tmp, data_t * grad, const param &par, int nx, int ny, int nz, int it, data_t dx, data_t dy, data_t dz, data_t dt) const
@@ -1470,80 +1471,95 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
             const data_t * in[1] = {curr[0]};
             asat_dirichlet_top(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod, alpha);
         }
-        //else if (par.bc_top==2)
-        //{
-        //    const data_t * in[2] = {curr[0],prev[0]};
-        //    asat_absorbing_top(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
-        //}
-        //else if (par.bc_top==3)
-        //{
-        //    const data_t * in[1] = {curr[0]};
-        //    asat_neumann_top(true, in, next[0], nx, nz, dx, dz, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
-        //}
+        else if (par.bc_top==2)
+        {
+            const data_t * in[2] = {curr[0],prev[0]};
+            asat_neumann_top<mu,aimp>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
+        }
+        else if (par.bc_top==3)
+        {
+            const data_t * in[2] = {curr[0],prev[0]};
+            asat_neumann_top<mu,zero>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
+        }
         //else if (par.bc_top==4)
         //{
         //    const data_t * in[2] = {curr[0],prev[0]};
         //    asat_neumann_absorbing_top(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_L*l, nx-par.pml_R*l, mod, _transmission->getCVals());
-        //}
-        //else if (par.bc_top==5)
-        //{
-        //    const data_t * in[1] = {curr[0]};
-        //    asat_neumann_dirichlet_top(true, in, next[0], nx, nz, dx, dz, par.pml_L*l, nx-par.pml_R*l, mod, alpha, _transmission->getCVals());
         //}
         if (par.bc_bottom==1)
         {
             const data_t * in[1] = {curr[0]};
             asat_dirichlet_bottom(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, mod, alpha);
         }
-        //else if (par.bc_bottom==2)
-        //{
-        //    const data_t * in[2] = {curr[0],prev[0]};
-        //    asat_absorbing_bottom(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
-        //}
-        //else if (par.bc_bottom==3)
-        //{
-        //    const data_t * in[1] = {curr[0]};
-        //    asat_neumann_bottom(true, in, next[0], nx, nz, dx, dz, par.pml_L*l, nx-par.pml_R*l, mod, 1.0);
-        //}
+        else if (par.bc_bottom==2)
+        {
+            const data_t * in[2] = {curr[0],prev[0]};
+            asat_neumann_bottom<mu,aimp>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
+        }
+        else if (par.bc_bottom==3)
+        {
+            const data_t * in[2] = {curr[0],prev[0]};
+            asat_neumann_bottom<mu,zero>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, ny, mod);
+        }
         if (par.bc_left==1)
         {
             const data_t * in[1] = {curr[0]};
             asat_dirichlet_left(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod, alpha);
         }
-        //else if (par.bc_left==2)
-        //{
-        //    const data_t * in[2] = {curr[0],prev[0]};
-        //    asat_absorbing_left(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_T*l, nz-par.pml_B*l, mod, 1.0);
-        //}
-        //else if (par.bc_left==3)
-        //{
-        //    const data_t * in[1] = {curr[0]};
-        //    asat_neumann_left(true, in, next[0], nx, nz, dx, dz, par.pml_T*l, nz-par.pml_B*l, mod, 1.0);
-        //}
+        else if (par.bc_left==2)
+        {
+            const data_t * in[2] = {curr[0],prev[0]};
+            asat_neumann_left<mu,aimp>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
+        }
+        else if (par.bc_left==3)
+        {
+            const data_t * in[2] = {curr[0],prev[0]};
+            asat_neumann_left<mu,zero>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
+        }
         if (par.bc_right==1)
         {
             const data_t * in[1] = {curr[0]};
             asat_dirichlet_right(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, ny, 0, nz, mod, alpha);
         }
-        //else if (par.bc_right==2)
-        //{
-        //    const data_t * in[2] = {curr[0],prev[0]};
-        //    asat_absorbing_right(true, in, next[0], nx, nz, dx, dz, par.dt, par.pml_T*l, nz-par.pml_B*l, mod, 1.0);
-        //}
-        //else if (par.bc_right==3)
-        //{
-        //    const data_t * in[1] = {curr[0]};
-        //    asat_neumann_right(true, in, next[0], nx, nz, dx, dz, par.pml_T*l, nz-par.pml_B*l, mod, 1.0);
-        //}
+        else if (par.bc_right==2)
+        {
+            const data_t * in[2] = {curr[0],prev[0]};
+            asat_neumann_right<mu,aimp>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
+        }
+        else if (par.bc_right==3)
+        {
+            const data_t * in[2] = {curr[0],prev[0]};
+            asat_neumann_right<mu,zero>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, ny, 0, nz, mod);
+        }
         if (par.bc_front==1)
         {
             const data_t * in[1] = {curr[0]};
             asat_dirichlet_front(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod, alpha);
         }
+        else if (par.bc_front==2)
+        {
+            const data_t * in[2] = {curr[0],prev[0]};
+            asat_neumann_front<mu,aimp>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
+        }
+        else if (par.bc_front==3)
+        {
+            const data_t * in[2] = {curr[0],prev[0]};
+            asat_neumann_front<mu,zero>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
+        }
         if (par.bc_back==1)
         {
             const data_t * in[1] = {curr[0]};
             asat_dirichlet_back(true, in, next[0], nx, ny, nz, dx, dy, dz, 0, nx, 0, nz, mod, alpha);
+        }
+        else if (par.bc_back==2)
+        {
+            const data_t * in[2] = {curr[0],prev[0]};
+            asat_neumann_back<mu,aimp>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
+        }
+        else if (par.bc_back==3)
+        {
+            const data_t * in[2] = {curr[0],prev[0]};
+            asat_neumann_back<mu,zero>(true, in, next[0], nx, ny, nz, dx, dy, dz, par.dt, 0, nx, 0, nz, mod);
         }
 
         // update wfld with the 2 steps time recursion
@@ -1555,8 +1571,8 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
 
         // scale boundaries when relevant (for locally absorbing BC only)
         data_t * in[1] = {next[0]};
-        // if (par.bc_top!=4) asat_scale_boundaries(in, nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, 0, nz, mod, par.dt, par.bc_top==2, par.bc_bottom==2, par.bc_left==2, par.bc_right==2);
-        // else asat_scale_boundaries_bis(in, nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, 0, nz, mod, _transmission->getCVals(), par.dt, par.bc_top==4, par.bc_bottom==2, par.bc_left==2, par.bc_right==2);
+        if (par.bc_top!=4) asat_scale_boundaries(in, nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, 0, nz, mod, par.dt, par.bc_top==2, par.bc_bottom==2, par.bc_left==2, par.bc_right==2, par.bc_front==2, par.bc_back==2);
+        // else asat_scale_boundaries_bis(in, nx, ny, nz, dx, dy, dz, 0, nx, 0, ny, 0, nz, mod, _transmission->getCVals(), par.dt, par.bc_top==4, par.bc_bottom==2, par.bc_left==2, par.bc_right==2, par.bc_front==2, par.bc_back==2);
         
         taperz(curr[0], nx, ny, nz, 1, 0, nx, 0, ny, par.taper_top, 0, 0, 1, par.taper_strength);
         taperz(next[0], nx, ny, nz, 1, 0, nx, 0, ny, par.taper_top, 0, 0, 1, par.taper_strength);

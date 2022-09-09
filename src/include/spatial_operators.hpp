@@ -231,7 +231,7 @@ void Dyy_var(bool add, const data_t* in, data_t* __restrict out, int nx, int ny,
     }
 }
 
-// Neumann SAT to impose free surface BC for elastic WE
+// Neumann SAT to impose free surface or absorbing BC for elastic WE
 // defined as template function to accomodate different expressions of parameters
 template<expr f1, expr f2, expr f3, expr f4, expr f5>
 void esat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int ixmin, int ixmax, int iymin, int iymax, const data_t ** par){
@@ -1887,7 +1887,7 @@ void esat_scale_boundaries(data_t** in, int nx, int ny, int nz, data_t dx, data_
         psc[0][0] += sqrt(par[1][0]/par[2][0])*dt / (2  * dz * h0); // top front left
         psc[0][1] += sqrt(par[1][0]/par[2][0])*dt / (2  * dz * h0);
         psc[0][2] += sqrt((par[0][0]+2*par[1][0])/par[2][0])*dt / (2  * dz * h0);
-        psc[1][0] += sqrt(par[1][IXYZ(nx-1,0,0)]/par[2][IXYZ(nx-1,0,0)])*dt / (2  * dz * h0); // top front left
+        psc[1][0] += sqrt(par[1][IXYZ(nx-1,0,0)]/par[2][IXYZ(nx-1,0,0)])*dt / (2  * dz * h0); // top front rights
         psc[1][1] += sqrt(par[1][IXYZ(nx-1,0,0)]/par[2][IXYZ(nx-1,0,0)])*dt / (2  * dz * h0);
         psc[1][2] += sqrt((par[0][IXYZ(nx-1,0,0)]+2*par[1][IXYZ(nx-1,0,0)])/par[2][IXYZ(nx-1,0,0)])*dt / (2  * dz * h0);
         psc[2][0] += sqrt(par[1][IXYZ(nx-1,ny-1,0)]/par[2][IXYZ(nx-1,ny-1,0)])*dt / (2  * dz * h0); // top back right
@@ -2573,7 +2573,147 @@ void asat_dirichlet_left(bool add, const data_t** in, __restrict data_t* out, in
 void asat_dirichlet_right(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int iymin, int iymax, int izmin, int izmax, const data_t ** par, data_t a);
 void asat_dirichlet_front(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int izmin, int izmax, const data_t ** par, data_t a);
 void asat_dirichlet_back(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int izmin, int izmax, const data_t ** par, data_t a);
+void asat_scale_boundaries(data_t** in, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, int ixmin, int ixmax, int iymin, int iymax, int izmin, int izmax, const data_t** par, data_t dt, bool top, bool bottom, bool left, bool right, bool front, bool back);
 
+// Neumann SAT to impose rigid-wall or absorbing BC for elastic WE
+// defined as template function to switch between the two types of BC
+template<expr f1, expr f2>
+void asat_neumann_top(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int ixmin, int ixmax, int iymin, int iymax, const data_t ** par)
+{
+    data_t scoef[4] = {11.0/6, -3, 1.5, -1.0/3};
+    data_t h0 = 17.0/48;
+    int nc1=4;
+    data_t d = dz;
+    data_t adh = 1.0/(h0*dz);
+    data_t sum=0;
+
+    // SAT = - H-1 (f1.S.in - f2.in/dt )_0  f1=reciprocal of density ; f2= zero or 1/(2.rho.v)=1/(2.sqrt(rho.K))
+    #pragma omp parallel for private(sum)
+    for (int iy=iymin; iy<iymax; iy++){
+        for (int ix=ixmin; ix<ixmax; ix++){
+            sum=0;
+            for (int iz=0; iz<nc1; iz++){
+                sum += scoef[iz] * in[0][IXYZ(ix,iy,iz)];
+            }
+            out[IXYZ(ix,iy,0)] = add*out[IXYZ(ix,iy,0)] - adh * ( f1(par,IXYZ(ix,iy,0))*sum/d - f2(par,IXYZ(ix,iy,0))*in[1][IXYZ(ix,iy,0)]/dt );
+        }
+    }
+}
+
+template<expr f1, expr f2>
+void asat_neumann_bottom(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int ixmin, int ixmax, int iymin, int iymax, const data_t ** par)
+{
+    data_t scoef[4] = {11.0/6, -3, 1.5, -1.0/3};
+    data_t h0 = 17.0/48;
+    int nc1=4;
+    data_t d = dz;
+    data_t adh = 1.0/(h0*dz);
+    data_t sum=0;
+
+    // SAT = - H-1 (f1.S.in - f2.in/dt )_0  f1=reciprocal of density ; f2= zero or 1/(2.rho.v)=1/(2.sqrt(rho.K))
+    #pragma omp parallel for private(sum)
+    for (int iy=iymin; iy<iymax; iy++){
+        for (int ix=ixmin; ix<ixmax; ix++){
+            sum=0;
+            for (int iz=0; iz<nc1; iz++){
+                sum += scoef[iz] * in[0][IXYZ(ix,iy,nz-1-iz)];
+            }
+            out[IXYZ(ix,iy,nz-1)] = add*out[IXYZ(ix,iy,nz-1)] - adh * ( f1(par,IXYZ(ix,iy,nz-1))*sum/d - f2(par,IXYZ(ix,iy,nz-1))*in[1][IXYZ(ix,iy,nz-1)]/dt );
+        }
+    }
+}
+
+template<expr f1, expr f2>
+void asat_neumann_left(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int iymin, int iymax, int izmin, int izmax, const data_t ** par)
+{
+    data_t scoef[4] = {11.0/6, -3, 1.5, -1.0/3};
+    data_t h0 = 17.0/48;
+    int nc1=4;
+    data_t d = dx;
+    data_t adh = 1.0/(h0*dx);
+    data_t sum=0;
+
+    // SAT = - H-1 (f1.S.in - f2.in/dt )_0  f1=reciprocal of density ; f2= zero or 1/(2.rho.v)=1/(2.sqrt(rho.K))
+    #pragma omp parallel for private(sum)
+    for (int iy=iymin; iy<iymax; iy++){
+        for (int iz=izmin; iz<izmax; iz++){
+            sum=0;
+            for (int ix=0; ix<nc1; ix++){
+                sum += scoef[ix] * in[0][IXYZ(ix,iy,iz)];
+            }
+            out[IXYZ(0,iy,iz)] = add*out[IXYZ(0,iy,iz)] - adh * ( f1(par,IXYZ(0,iy,iz))*sum/d - f2(par,IXYZ(0,iy,iz))*in[1][IXYZ(0,iy,iz)]/dt );
+        }
+    }
+}
+
+template<expr f1, expr f2>
+void asat_neumann_right(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int iymin, int iymax, int izmin, int izmax, const data_t ** par)
+{
+    data_t scoef[4] = {11.0/6, -3, 1.5, -1.0/3};
+    data_t h0 = 17.0/48;
+    int nc1=4;
+    data_t d = dx;
+    data_t adh = 1.0/(h0*dx);
+    data_t sum=0;
+
+    // SAT = - H-1 (f1.S.in - f2.in/dt )_0  f1=reciprocal of density ; f2= zero or 1/(2.rho.v)=1/(2.sqrt(rho.K))
+    #pragma omp parallel for private(sum)
+    for (int iy=iymin; iy<iymax; iy++){
+        for (int iz=izmin; iz<izmax; iz++){
+            sum=0;
+            for (int ix=0; ix<nc1; ix++){
+                sum += scoef[ix] * in[0][IXYZ(nx-1-ix,iy,iz)];
+            }
+            out[IXYZ(nx-1,iy,iz)] = add*out[IXYZ(nx-1,iy,iz)] - adh * ( f1(par,IXYZ(nx-1,iy,iz))*sum/d - f2(par,IXYZ(nx-1,iy,iz))*in[1][IXYZ(nx-1,iy,iz)]/dt );
+        }
+    }
+}
+
+template<expr f1, expr f2>
+void asat_neumann_front(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int ixmin, int ixmax, int izmin, int izmax, const data_t ** par)
+{
+    data_t scoef[4] = {11.0/6, -3, 1.5, -1.0/3};
+    data_t h0 = 17.0/48;
+    int nc1=4;
+    data_t d = dy;
+    data_t adh = 1.0/(h0*dy);
+    data_t sum=0;
+
+    // SAT = - H-1 (f1.S.in - f2.in/dt )_0  f1=reciprocal of density ; f2= zero or 1/(2.rho.v)=1/(2.sqrt(rho.K))
+    #pragma omp parallel for private(sum)
+    for (int ix=ixmin; ix<ixmax; ix++){
+        for (int iz=izmin; iz<izmax; iz++){
+            sum=0;
+            for (int iy=0; iy<nc1; iy++){
+                sum += scoef[iy] * in[0][IXYZ(ix,iy,iz)];
+            }
+            out[IXYZ(ix,0,iz)] = add*out[IXYZ(ix,0,iz)] - adh * ( f1(par,IXYZ(ix,0,iz))*sum/d - f2(par,IXYZ(ix,0,iz))*in[1][IXYZ(ix,0,iz)]/dt );
+        }
+    }
+}
+
+template<expr f1, expr f2>
+void asat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t dt, int ixmin, int ixmax, int izmin, int izmax, const data_t ** par)
+{
+    data_t scoef[4] = {11.0/6, -3, 1.5, -1.0/3};
+    data_t h0 = 17.0/48;
+    int nc1=4;
+    data_t d = dy;
+    data_t adh = 1.0/(h0*dy);
+    data_t sum=0;
+
+    // SAT = - H-1 (f1.S.in - f2.in/dt )_0  f1=reciprocal of density ; f2= zero or 1/(2.rho.v)=1/(2.sqrt(rho.K))
+    #pragma omp parallel for private(sum)
+    for (int ix=ixmin; ix<ixmax; ix++){
+        for (int iz=izmin; iz<izmax; iz++){
+            sum=0;
+            for (int iy=0; iy<nc1; iy++){
+                sum += scoef[iy] * in[0][IXYZ(ix,ny-1-iy,iz)];
+            }
+            out[IXYZ(ix,ny-1,iz)] = add*out[IXYZ(ix,ny-1,iz)] - adh * ( f1(par,IXYZ(ix,ny-1,iz))*sum/d - f2(par,IXYZ(ix,ny-1,iz))*in[1][IXYZ(ix,ny-1,iz)]/dt );
+        }
+    }
+}
 
 #undef IZ
 #undef IX
