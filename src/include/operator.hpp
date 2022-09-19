@@ -271,7 +271,7 @@ public:
     emodelSoftClip(){}
     ~emodelSoftClip(){}
     emodelSoftClip(const hypercube<data_t> &domain, data_t vpmin, data_t vpmax, data_t vsmin, data_t vsmax, data_t rhomin, data_t rhomax, data_t spratio=1/sqrt(2.00001), int p=9, int q=9){
-        successCheck((domain.getNdim()==3) && (domain.getAxis(3).n>=3),"The domain must be 3D with 3rd dimension containing at least 3 fields\n");
+        successCheck((domain.getNdim()==4) && (domain.getAxis(4).n>=3),"The domain must be 4D with 4th dimension containing at least 3 fields\n");
         _domain = domain;
         _range = domain;
         _vpmin=vpmin; _vpmax=vpmax; _vsmin=vsmin; _vsmax=vsmax; _rhomin=rhomin; _rhomax=rhomax; _spratio=spratio;
@@ -466,58 +466,6 @@ public:
     }
 };
 
-// operator to take the difference of two consecutive traces in the second direction
-// The add option is inactive
-class xdifference : public loper {
-public:
-    xdifference(){}
-    ~xdifference(){}
-    xdifference(const hypercube<data_t> &domain){
-        _domain = domain;
-        _range = domain;
-    }
-    xdifference * clone() const {
-        xdifference * op = new xdifference(_domain);
-        return op;
-    }    
-    void apply_forward(bool add, const data_t * pmod, data_t * pdat){
-        int nt = _domain.getAxis(1).n;
-        int nx = _domain.getAxis(2).n;
-        int ny = _domain.getN123() / (nt*nx);
-        const data_t (*pm) [nx][nt] = (const data_t (*)[nx][nt]) pmod;
-        data_t (*pd) [nx][nt] = (data_t (*)[nx][nt]) pdat;
-        #pragma omp parallel for
-        for (int iy=0; iy<ny; iy++){
-            for (int ix=nx-1; ix>0; ix--){
-                for (int it=0; it<nt; it++){
-                    pd[iy][ix][it] = add*pd[iy][ix][it] + pm[iy][ix][it]-pm[iy][ix-1][it];
-                }
-            }
-            for (int it=0; it<nt; it++) pd[iy][0][it] = 0;
-        }
-    }
-    void apply_adjoint(bool add, data_t * pmod, const data_t * pdat){
-        int nt = _domain.getAxis(1).n;
-        int nx = _domain.getAxis(2).n;
-        int ny = _domain.getN123() / (nt*nx);
-        data_t (*pm) [nx][nt] = (data_t (*)[nx][nt]) pmod;
-        const data_t (*pd) [nx][nt] = (const data_t (*)[nx][nt]) pdat;
-        #pragma omp parallel for
-        for (int iy=0; iy<ny; iy++){
-            for (int it=0; it<nt; it++) {
-                pm[iy][0][it] = - pd[iy][1][it];
-            }
-            for (int ix=1; ix<nx-1; ix++){
-                for (int it=0; it<nt; it++){
-                    pm[iy][ix][it] = pd[iy][ix][it]-pd[iy][ix+1][it];
-                }
-            }
-            for (int it=0; it<nt; it++) {
-                pm[iy][nx-1][it] = pd[iy][nx-1][it];
-            }
-        }
-    }
-};
 
 // class to tranform from t-x (or z-x) to f-x space and vice versa
 class fxTransform{
@@ -593,76 +541,8 @@ public:
     void cadjoint(bool add, std::shared_ptr<cvecReg<data_t> > mod, const std::shared_ptr<cvecReg<data_t> > dat){
         cinverse(add, mod, dat);
     }
-
-    void testInverse();
-    void testCInverse();
-    void testAdjoint();
-    void testCAdjoint();
 };
 
-// class to tranform from t-x (or z-x) to f-k space and vice versa
-class fkTransform : public fxTransform{
-protected:
-
-public:
-	fkTransform(){}
-    ~fkTransform(){}
-    fkTransform(const hypercube<data_t> &domain){
-        successCheck(domain.getNdim()>1,"The domain must contain at least 2 dimensions\n");
-        _domain = domain;
-        std::vector<axis<data_t> > axes = domain.getAxes();
-        axis<data_t> Z = axes[0];
-        axis<data_t> X = axes[1];
-        Z.n = Z.n/2 + 1;
-        Z.d = 1.0/((domain.getAxis(1).n-1)*Z.d);
-        Z.o = 0.0;
-        X.d = 2*M_PI/((X.n-1)*X.d);
-        X.o = - X.d * floor((X.n-1)/2);
-        axes[0] = Z;
-        axes[1] = X;
-        _range = hypercube<data_t>(axes);
-        Z.n = domain.getAxis(1).n;
-        Z.o = -(Z.n-1)/2 * Z.d;
-        axes[0] = Z;
-        _crange = hypercube<data_t> (axes);
-    }
-    fkTransform * clone() const{
-        fkTransform * op = new fkTransform(_domain);
-        return op;
-    }
-    void setDomainRange(const hypercube<data_t> &domain, const hypercube<data_t> &range){
-        successCheck(domain.getN123()==_domain.getN123(),"The new domain must have the same number of samples\n");
-        successCheck(range.getN123()==_range.getN123(),"The new range must have the same number of samples\n");
-        successCheck(domain.getAxis(1)==_domain.getAxis(1),"The first axis in the domain must be the same\n");
-        successCheck(domain.getAxis(2)==_domain.getAxis(2),"The second axis in the domain must be the same\n");
-        successCheck(range.getAxis(1)==_range.getAxis(1),"The first axis in the range must be the same\n");
-        successCheck(range.getAxis(2)==_range.getAxis(2),"The second axis in the range must be the same\n");
-        _domain = domain;
-        _range = range;
-    }
-    bool checkDomainRange(const std::shared_ptr<vecReg<data_t> > mod, const std::shared_ptr<cvecReg<data_t> > dat) const {
-        bool ans1 = (mod->getN123()==_domain.getN123());
-        bool ans2 = (dat->getN123()==_range.getN123());
-        bool ans3 = (mod->getHyper()->getAxis(1)==_domain.getAxis(1));
-        bool ans4 = (dat->getHyper()->getAxis(1)==_range.getAxis(1));
-        bool ans5 = (mod->getHyper()->getAxis(2)==_domain.getAxis(2));
-        bool ans6 = (dat->getHyper()->getAxis(2)==_range.getAxis(2));
-        return (ans1 && ans2 && ans3 && ans4 && ans5 && ans6);
-    }
-    bool checkCDomainRange(const std::shared_ptr<cvecReg<data_t> > mod, const std::shared_ptr<cvecReg<data_t> > dat) const {
-        bool ans1 = (mod->getN123()==_domain.getN123());
-        bool ans2 = (dat->getN123()==_crange.getN123());
-        bool ans3 = (mod->getHyper()->getAxis(1)==_domain.getAxis(1));
-        bool ans4 = (dat->getHyper()->getAxis(1)==_crange.getAxis(1));
-        bool ans5 = (mod->getHyper()->getAxis(2)==_domain.getAxis(2));
-        bool ans6 = (dat->getHyper()->getAxis(2)==_crange.getAxis(2));
-        return (ans1 && ans2 && ans3 && ans4 && ans5 && ans6);
-    }
-    void forward(bool add, const std::shared_ptr<vecReg<data_t> > mod, std::shared_ptr<cvecReg<data_t> > dat);
-    void inverse(bool add, std::shared_ptr<vecReg<data_t> > mod, const std::shared_ptr<cvecReg<data_t> > dat);
-    void cforward(bool add, const std::shared_ptr<cvecReg<data_t> > mod, std::shared_ptr<cvecReg<data_t> > dat);
-    void cinverse(bool add, std::shared_ptr<cvecReg<data_t> > mod, const std::shared_ptr<cvecReg<data_t> > dat);
-};
 
 // low order 3D gradient operator to be used in first order Tikhonov regularization
 // the boundary gradient is discarded
@@ -717,7 +597,7 @@ public:
 // Model extrapolation from 1D to 3D along a given horizon in the second and third dimensions
 class extrapolator1d3d : public loper {
 protected:
-    std::shared_ptr<vecReg<data_t> > _hrz; // 1D horizon for extrapolation
+    std::shared_ptr<vecReg<data_t> > _hrz; // 2D horizon (surface) for extrapolation
 public:
     extrapolator1d3d(){}
     ~extrapolator1d3d(){}
@@ -736,63 +616,7 @@ public:
         extrapolator1d3d * op = new extrapolator1d3d(_domain, _hrz);
         return op;
     }    
-    void apply_forward(bool add, const data_t * pmod, data_t * pdat){}
-    void apply_adjoint(bool add, data_t * pmod, const data_t * pdat){}
-    void apply_inverse(bool add, data_t * pmod, const data_t * pdat){}
-};
-
-// Time domain Convolution of 1D filter with N-dimensional vector
-class conv1dnd : public loper {
-protected:
-    std::shared_ptr<vecReg<data_t> > _f; // filter always treated as 1D
-//    bool _frequency; // perform convolution in time or frequency domain
-    bool _centered; // center the convolution
-
-public:
-    conv1dnd(){}
-    ~conv1dnd(){}
-    conv1dnd(const hypercube<data_t> domain, const std::shared_ptr<vecReg<data_t> > f, bool centered = true){
-        successCheck(f->getHyper()->getAxis(1).d==domain.getAxis(1).d,"Filter must have the same sampling as the domain fast axis\n");
-        _domain=domain;
-        _range=domain;
-        _f=f->clone();
-        _centered = centered;
-    }
-    conv1dnd * clone() const {
-        conv1dnd * op = new conv1dnd(_domain,_f,_centered);
-        return op;
-    }
     void apply_forward(bool add, const data_t * pmod, data_t * pdat);
     void apply_adjoint(bool add, data_t * pmod, const data_t * pdat);
+    void apply_inverse(bool add, data_t * pmod, const data_t * pdat);
 };
-
-// Time domain Convolution of N-dimensional data with 1D filter
-// domain always treated as 1D
-class convnd1d : public loper {
-protected:
-    std::shared_ptr<vecReg<data_t> > _f; // N-dimensional data
-//    bool _frequency; // perform convolution in time or frequency domain
-    bool _centered; // center the convolution (in the case of time domain)
-
-public:
-    convnd1d(){}
-    ~convnd1d(){}
-    convnd1d(const hypercube<data_t> domain, const std::shared_ptr<vecReg<data_t> > f, bool centered = true){
-        successCheck(f->getHyper()->getAxis(1).d==domain.getAxis(1).d,"Data must have the same sampling as the domain fast axis\n");
-        _domain=domain;
-        _range=*f->getHyper();
-        _f=f->clone();
-        _centered = centered;
-    }
-    convnd1d * clone() const {
-        convnd1d * op = new convnd1d(_domain,_f,_centered);
-        return op;
-    }
-    void apply_forward(bool add, const data_t * pmod, data_t * pdat);
-    void apply_adjoint(bool add, data_t * pmod, const data_t * pdat);
-};
-
-// transform a filter to zero phase
-std::shared_ptr<vecReg<data_t> > zero_phase(const std::shared_ptr<vecReg<data_t> > dat);
-// transform a filter to minimum phase
-std::shared_ptr<vecReg<data_t> > minimum_phase(const std::shared_ptr<vecReg<data_t> > dat, const data_t eps);

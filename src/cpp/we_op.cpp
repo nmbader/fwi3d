@@ -315,28 +315,12 @@ void analyzeModel(const hypercube<data_t> &domain, std::shared_ptr<vecReg<data_t
             rhomin = model->min(2*ny*nx*nz,3*ny*nx*nz);
             rhomax = model->max(2*ny*nx*nz,3*ny*nx*nz);
 
-            if (par.nmodels==6)
-            {
-                delmin = model->min(3*ny*nx*nz,4*ny*nx*nz);
-                delmax = model->max(3*ny*nx*nz,4*ny*nx*nz);
-                epsmin = model->min(4*ny*nx*nz,5*ny*nx*nz);
-                epsmax = model->max(4*ny*nx*nz,5*ny*nx*nz);
-                gammamin = model->min(5*ny*nx*nz,6*ny*nx*nz);
-                gammamax = model->max(5*ny*nx*nz,6*ny*nx*nz);
-            }
-
             if (par.verbose>1) {
                 fprintf(stderr,"Vp bounds after hard clipping are %.2f - %.2f km/s\n",vpmin,vpmax);
                 fprintf(stderr,"Vs bounds after hard clipping are %.2f - %.2f km/s\n",vsmin,vsmax);
                 fprintf(stderr,"Rho bounds after hard clipping are %.2f - %.2f g/cc\n",rhomin,rhomax);
-                if (par.nmodels==6){
-                    fprintf(stderr,"Delta bounds after hard clipping are %.2f - %.2f\n",delmin,delmax);
-                    fprintf(stderr,"Epsilon bounds after hard clipping are %.2f - %.2f\n",epsmin,epsmax);
-                    fprintf(stderr,"Gamma bounds after hard clipping are %.2f - %.2f\n",gammamin,gammamax);
-                }
             }
         }
-
         par.vmax=vpmax;
         par.vmin=vsmin;
     }
