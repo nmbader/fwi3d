@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
 
 #Name of our cmake project
-project(fwi2d LANGUAGES CXX)
+project(fwi3d LANGUAGES CXX)
 
 
 #Require c++11

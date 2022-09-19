@@ -10,22 +10,22 @@ set(PYTHON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/python)
 set(MAIN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/main)
 set(DEV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/dev)
 
-set(SRC_FWI2D ${SRC_DIR}/injector.cpp
-#                ${SRC_DIR}/lsolver.cpp
+set(SRC_FWI3D ${SRC_DIR}/injector.cpp
                 ${SRC_DIR}/misc.cpp
 #                ${SRC_DIR}/nlsolver.cpp
                 ${SRC_DIR}/operator.cpp
                 ${SRC_DIR}/param.cpp
                 ${SRC_DIR}/spatial_operators.cpp
                 ${SRC_DIR}/we_op.cpp
+                ${SRC_DIR}/bsplines.cpp
 	)
 
 if(GPU)
-        set(SRC_FWI2D ${SRC_FWI2D} ${CUDA_DIR}/cudaKernels.cu
+        set(SRC_FWI3D ${SRC_FWI3D} ${CUDA_DIR}/cudaKernels.cu
         ${CUDA_DIR}/cudaWeOp.cpp
         )
 else()
-#        set(SRC_FWI2D ${SRC_FWI2D} ${SRC_DIR}/dummy.cpp)
+#        set(SRC_FWI3D ${SRC_FWI3D} ${SRC_DIR}/dummy.cpp)
 endif()
 
 set(HEADERS ${INC_DIR}/injector.hpp
@@ -38,6 +38,7 @@ set(HEADERS ${INC_DIR}/injector.hpp
                 ${INC_DIR}/spatial_operators.hpp
                 ${INC_DIR}/vecReg.hpp
                 ${INC_DIR}/we_op.hpp
+                ${INC_DIR}/bsplines.hpp
         )
 
 set(PYTHON ${PYTHON_DIR}/seppy.py
@@ -50,7 +51,7 @@ if (GPU)
 endif()
 
 #building the project library
-add_library(fwi3d ${SRC_FWI2D})
+add_library(fwi3d ${SRC_FWI3D})
 target_link_libraries(fwi3d fftw3f fftw3)
 if (MPI_FOUND)
         target_link_libraries(fwi3d ${MPI_CXX_LIBRARIES} )
@@ -60,9 +61,11 @@ endif()
 add_executable(WE_MODELING_3D.x ${MAIN_DIR}/we_modeling.cpp)
 target_link_libraries(WE_MODELING_3D.x fwi3d sep)
 
-
 #add_executable(FWI3D.x ${MAIN_DIR}/fwi3d.cpp)
 #target_link_libraries(FWI3D.x fwi3d sep)
+
+add_executable(BSPLINES3D.x ${MAIN_DIR}/bsplines3d.cpp)
+target_link_libraries(BSPLINES3D.x fwi3d sep)
 
 #installing libraries and executables
 install(FILES ${HEADERS} DESTINATION include)
@@ -72,5 +75,6 @@ install(FILES ${PYTHON}
         DESTINATION bin)
 install(TARGETS WE_MODELING_3D.x
 #                FWI3D.x
+                BSPLINES3D.x
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
         DESTINATION bin)
