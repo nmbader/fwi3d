@@ -749,7 +749,7 @@ void extrapolator1d3d::apply_forward(bool add, const data_t * pmod, data_t * pda
 
     int nz = _range.getAxis(1).n;
     int nx = _range.getAxis(2).n;
-    int ny = _range.getN123(3).n;
+    int ny = _range.getAxis(3).n;
     int nc = _range.getN123() / (nz*nx*ny);
     data_t oz = _range.getAxis(1).o;
     data_t dz = _range.getAxis(1).d;
@@ -787,7 +787,7 @@ void extrapolator1d3d::apply_adjoint(bool add, data_t * pmod, const data_t * pda
 
     int nz = _range.getAxis(1).n;
     int nx = _range.getAxis(2).n;
-    int ny = _range.getN123(3).n;
+    int ny = _range.getAxis(3).n;
     int nc = _range.getN123() / (nz*nx*ny);
     data_t oz = _range.getAxis(1).o;
     data_t dz = _range.getAxis(1).d;
@@ -839,4 +839,175 @@ void extrapolator1d3d::apply_inverse(bool add, data_t * pmod, const data_t * pda
     {
         for (int iz=0; iz<nz; iz++) pm[ic][iz] = add*pm[ic][iz] + pd[ic][0][0][iz]; 
     }
+}
+
+void conv1dnd::apply_forward(bool add, const data_t * pmod, data_t * pdat){
+
+    if (!add) memset(pdat,0,_range.getN123()*sizeof(data_t));
+
+    int nt = _domain.getAxis(1).n;
+    int nx = _domain.getN123()/nt;
+    int nf = _f->getN123();
+
+    data_t * pf = _f->getVals();
+    data_t scale = 1;
+    //data_t scale = nt;
+
+    int sh = 0;
+    if (_centered) sh = std::floor((nf+1)/2)-1;
+
+    #pragma omp parallel for
+    for (int ix=0; ix<nx; ix++){
+        for (int it=0; it<nt; it++){
+            for (int j=std::max(0,it-nt+1+sh); j<std::min(nf,it+1+sh); j++) pdat[ix*nt+it] += pf[j]*pmod[ix*nt+it-j+sh]/scale;
+        }
+    }
+}
+
+void conv1dnd::apply_adjoint(bool add, data_t * pmod, const data_t * pdat){
+
+    if (!add) memset(pmod,0,_domain.getN123()*sizeof(data_t));
+
+    int nt = _domain.getAxis(1).n;
+    int nx = _domain.getN123()/nt;
+    int nf = _f->getN123();
+
+    data_t * pf = _f->getVals();
+    data_t scale = 1;
+    //data_t scale = nt;
+
+    int sh = 0;
+    if (_centered) sh = std::floor((nf+1)/2)-1;
+
+    #pragma omp parallel for
+    for (int ix=0; ix<nx; ix++){
+        for (int it=0; it<nt; it++){
+            for (int j=std::max(0,it-nt+1+sh); j<std::min(nf,it+1+sh); j++) pmod[ix*nt+it-j+sh] += pf[j]*pdat[ix*nt+it]/scale;
+        }
+    }
+}
+
+std::shared_ptr<vecReg<data_t> > zero_phase(const std::shared_ptr<vecReg<data_t> > dat){
+
+    axis<data_t>T = dat->getHyper()->getAxis(1);
+    axis<data_t>X(1,0,1);
+    
+    // Make a new vector with odd length
+    std::shared_ptr<vecReg<data_t> > vec0;
+	if (2*(T.n/2)==T.n) {
+		T.n+=1;
+        vec0 = std::make_shared<vecReg<data_t> >(hypercube<data_t>(T));
+
+        for (int iz=0; iz<T.n-1; iz++){
+        vec0->getVals()[iz] = dat->getVals()[iz];
+        }
+        vec0->getVals()[T.n-1] = 0;
+    }
+	
+    else {
+        vec0 = dat;
+        vec0->setHyper((hypercube<data_t>(T,X)));
+    }
+
+    // Fourier transform the vector
+    fxTransform fx(hypercube<data_t>(T,X));
+    axis<data_t>F;
+    F.d=fx.getRange()->getAxis(1).d;
+    F.o=0;
+    F.n=T.n/2 + 1;
+    std::shared_ptr<cvecReg<data_t> > fxvec = std::make_shared<cvecReg<data_t> >(hypercube<data_t>(F,X));
+    fx.forward(false,vec0,fxvec);
+
+    int N = F.n;
+    data_t dw = 2*M_PI/T.n;
+    data_t r;
+    std::complex<data_t> z (0,0);
+
+    // Modify the FT by setting a linear phase while keeping the same amplitude spectrum
+	for (int i=0; i<N; i++){
+
+        r = abs(fxvec->getVals()[i]);
+
+        // add linear phase shift (* exp (-j.omega.dt.(Nt-1)/2)))
+        z.real(r*cos(-i*dw*(T.n - 1)/2));
+        z.imag(r*sin(-i*dw*(T.n - 1)/2));
+
+        fxvec->getVals()[i] = z;
+	}
+
+    // inverse FT and modify the original vector
+    fx.inverse(false,vec0,fxvec);
+    T.o = (int)(-T.n/2) * T.d; 
+    vec0->setHyper(hypercube<data_t>(T));
+    
+    return vec0;
+}
+std::shared_ptr<vecReg<data_t> > minimum_phase(const std::shared_ptr<vecReg<data_t> > dat, const data_t eps){
+    
+    axis<data_t>T = dat->getHyper()->getAxis(1);
+    axis<data_t>X(1,0,1);
+    
+    // Make a new vector with odd length
+    std::shared_ptr<vecReg<data_t> > vec0;
+	if (2*(T.n/2)==T.n) {
+		T.n+=1;
+        vec0 = std::make_shared<vecReg<data_t> >(hypercube<data_t>(T));
+
+        for (int iz=0; iz<T.n-1; iz++){
+        vec0->getVals()[iz] = dat->getVals()[iz];
+        }
+        vec0->getVals()[T.n-1] = 0;
+    }
+	
+    else {
+        vec0 = dat;
+        vec0->setHyper((hypercube<data_t>(T,X)));
+    }
+
+    // Fourier transform the vector
+    fxTransform fx(hypercube<data_t>(T,X));
+    axis<data_t>F;
+    F.d=fx.getRange()->getAxis(1).d;
+    F.o=0;
+    F.n=T.n/2 + 1;
+    std::shared_ptr<cvecReg<data_t> > fxvec = std::make_shared<cvecReg<data_t> >(hypercube<data_t>(F,X));
+    fx.forward(false,vec0,fxvec);
+
+    int N = F.n;
+    data_t r;
+    std::complex<data_t> z (0,0);
+
+    // Modify the FT by making it real and equal to the logarithm of the power spectrum
+	for (int i=0; i<N; i++){
+
+        r = sqrt(norm(fxvec->getVals()[i]));
+
+        // set FT = log(r+eps)
+        z.real(log(r+eps));
+        z.imag(0);
+
+        fxvec->getVals()[i] = z;
+	}
+
+    // inverse FT and keep the causal part
+    fx.inverse(false,vec0,fxvec);
+    for (int iz=1; iz<T.n/2+1; iz++){
+        vec0->getVals()[iz] *= 2;
+    }
+    for (int iz=T.n/2+1; iz<T.n; iz++){
+        vec0->getVals()[iz] = 0;
+    }
+
+    // FT again and take the exponent
+    fx.forward(false,vec0,fxvec);
+    for (int iz=0; iz<N; iz++){
+        fxvec->getVals()[iz] = exp(fxvec->getVals()[iz]);
+    }
+
+    // inverse FT 
+    fx.inverse(false,vec0,fxvec);
+    T.o = 0; 
+    vec0->setHyper(hypercube<data_t>(T));
+    
+    return vec0;
 }

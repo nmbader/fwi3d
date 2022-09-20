@@ -620,3 +620,33 @@ public:
     void apply_adjoint(bool add, data_t * pmod, const data_t * pdat);
     void apply_inverse(bool add, data_t * pmod, const data_t * pdat);
 };
+
+// Time domain Convolution of 1D filter with N-dimensional vector
+class conv1dnd : public loper {
+protected:
+    std::shared_ptr<vecReg<data_t> > _f; // filter always treated as 1D
+//    bool _frequency; // perform convolution in time or frequency domain
+    bool _centered; // center the convolution
+
+public:
+    conv1dnd(){}
+    ~conv1dnd(){}
+    conv1dnd(const hypercube<data_t> domain, const std::shared_ptr<vecReg<data_t> > f, bool centered = true){
+        successCheck(f->getHyper()->getAxis(1).d==domain.getAxis(1).d,"Filter must have the same sampling as the domain fast axis\n");
+        _domain=domain;
+        _range=domain;
+        _f=f->clone();
+        _centered = centered;
+    }
+    conv1dnd * clone() const {
+        conv1dnd * op = new conv1dnd(_domain,_f,_centered);
+        return op;
+    }
+    void apply_forward(bool add, const data_t * pmod, data_t * pdat);
+    void apply_adjoint(bool add, data_t * pmod, const data_t * pdat);
+};
+
+// transform a filter to zero phase
+std::shared_ptr<vecReg<data_t> > zero_phase(const std::shared_ptr<vecReg<data_t> > dat);
+// transform a filter to minimum phase
+std::shared_ptr<vecReg<data_t> > minimum_phase(const std::shared_ptr<vecReg<data_t> > dat, const data_t eps);

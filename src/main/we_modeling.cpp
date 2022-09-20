@@ -79,6 +79,7 @@ int main(int argc, char **argv){
 
 // Run the forward modeling
         std::shared_ptr<vec> rcv = std::make_shared<vec> (*op->getRange());
+        rcv->zero();
         op->forward(false,model,rcv);
 
 // Save one full wavefield if requested

@@ -178,8 +178,6 @@ void readParam(int argc, char **argv, param &par){
     readParam<bool>(argc, argv, "soft_clip", par.soft_clip);
     readParam<bool>(argc, argv, "inversion1d", par.inversion1d);
     readParam<bool>(argc, argv, "normalize", par.normalize);
-    readParam<bool>(argc, argv, "integrate", par.integrate);
-    readParam<bool>(argc, argv, "double_difference", par.double_difference);
     readParam<bool>(argc, argv, "normalize_obj_func", par.normalize_obj_func);
     readParam<bool>(argc, argv, "ls_version", par.ls_version);
     readParam<bool>(argc, argv, "format", par.format);
@@ -265,8 +263,6 @@ void analyzeNLInversion(param &par)
         if (par.verbose>0) fprintf(stderr,"The source time function will be rescaled for the first %d trials as part of Variable Projection method. All non-linear operators on the data will be deactivated\n",par.scale_source_times);
     }
     if (par.normalize && par.verbose>0) fprintf(stderr,"The modeled and observed data will be normalized trace by trace\n");
-    if (par.double_difference && par.verbose>0) fprintf(stderr,"The trace-to-trace double-difference will be applied to modeled and observed data\n");
-    if (par.integrate && par.verbose>0) fprintf(stderr,"The modeled and observed data will be integrated in time trace by trace\n");
     if (par.envelop==1 && par.verbose>0) fprintf(stderr,"The envelop of modeled and observed data will be computed trace by trace\n");
     else if (par.envelop==2 && par.verbose>0) fprintf(stderr,"The envelop squared of modeled and observed data will be computed trace by trace\n");
     if (par.verbose>0) fprintf(stderr,"If \"ioutput\" is provided, the model, gradient, and residual will be saved every %d iterations\n",par.isave);

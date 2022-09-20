@@ -18,6 +18,7 @@ class nl_we_op : virtual public nloper {
 public:
     param _par;
     std::shared_ptr<vecReg<data_t> > _src;
+    std::shared_ptr<vecReg<data_t> > _allsrc;
     std::shared_ptr<vecReg<data_t> > _full_wfld;
 
     nl_we_op(){}
@@ -55,6 +56,7 @@ public:
     nl_we_op_e(){}
     virtual ~nl_we_op_e(){}
     nl_we_op_e(const hypercube<data_t> &domain, const std::shared_ptr<vecReg<data_t> > allsrc, int s, param &par){
+        _allsrc = allsrc;
         _src = std::make_shared<vecReg<data_t> >(hypercube<data_t>(allsrc->getHyper()->getAxis(1),allsrc->getHyper()->getAxis(2)));
         int n=_src->getN123();
         memcpy(_src->getVals(),allsrc->getVals()+s*n,n*sizeof(data_t));
@@ -134,6 +136,7 @@ public:
     nl_we_op_a(){}
     virtual ~nl_we_op_a(){}
     nl_we_op_a(const hypercube<data_t> &domain, const std::shared_ptr<vecReg<data_t> > allsrc, int s, param &par){
+        _allsrc = allsrc;
         _src = std::make_shared<vecReg<data_t> >(hypercube<data_t>(allsrc->getHyper()->getAxis(1)));
         int n=_src->getN123();
         memcpy(_src->getVals(),allsrc->getVals()+s*n,n*sizeof(data_t));

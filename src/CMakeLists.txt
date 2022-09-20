@@ -12,12 +12,13 @@ set(DEV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/dev)
 
 set(SRC_FWI3D ${SRC_DIR}/injector.cpp
                 ${SRC_DIR}/misc.cpp
-#                ${SRC_DIR}/nlsolver.cpp
+                ${SRC_DIR}/nlsolver.cpp
                 ${SRC_DIR}/operator.cpp
                 ${SRC_DIR}/param.cpp
                 ${SRC_DIR}/spatial_operators.cpp
                 ${SRC_DIR}/we_op.cpp
                 ${SRC_DIR}/bsplines.cpp
+                ${SRC_DIR}/optimization.cpp
 	)
 
 if(GPU)
@@ -31,9 +32,9 @@ endif()
 set(HEADERS ${INC_DIR}/injector.hpp
                 ${INC_DIR}/IO.hpp
                 ${INC_DIR}/misc.hpp
-#                ${INC_DIR}/nlsolver.hpp
+                ${INC_DIR}/nlsolver.hpp
                 ${INC_DIR}/operator.hpp
-#                ${INC_DIR}/optimization.hpp
+                ${INC_DIR}/optimization.hpp
                 ${INC_DIR}/param.hpp
                 ${INC_DIR}/spatial_operators.hpp
                 ${INC_DIR}/vecReg.hpp
