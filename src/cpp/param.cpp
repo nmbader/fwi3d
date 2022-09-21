@@ -171,7 +171,6 @@ void readParam(int argc, char **argv, param &par){
     readParam<int>(argc, argv, "regularization", par.regularization);
     readParam<int>(argc, argv, "scale_source_times", par.scale_source_times);
     readParam<int>(argc, argv, "verbose", par.verbose);
-    readParam<int>(argc, argv, "device", par.device);
     readParam<int>(argc, argv, "nthreads", par.nthreads);
     readParam<bool>(argc, argv, "mt", par.mt);
     readParam<bool>(argc, argv, "bsplines", par.bsplines);
@@ -251,7 +250,7 @@ void analyzeNLInversion(param &par)
         fprintf(stderr,"Maximum number of trials per iteration = %d\n",par.max_trial);
         fprintf(stderr,"Threshold to stop the inversion = %f\n",par.threshold);
     }
-    if (par.inversion1d && par.verbose>0) fprintf(stderr,"A 1D inversion will be performed in the z-dimension. If \"horizon\" is not provided, the extrapolation will be flat in the x-dimension where any possible B-splines will be ignored\n");
+    if (par.inversion1d && par.verbose>0) fprintf(stderr,"A 1D inversion will be performed in the z-dimension. If \"horizon\" is not provided, the extrapolation will be flat in the xy-dimensions where any possible B-splines will be ignored\n");
     if (par.mask_file != "none" && par.verbose>0) fprintf(stderr,"A gradient mask file is expected and will be applied at each trial\n");
     if (par.weights_file != "none" && par.verbose>0) fprintf(stderr,"A data weights file is expected and will be applied to modeled and observed data\n");
     if (par.prior_file != "none" && par.verbose>0) fprintf(stderr,"A prior model file is expected and will be used in the regularization if any\n");

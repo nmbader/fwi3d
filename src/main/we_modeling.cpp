@@ -1,6 +1,7 @@
 #include <string.h>
 #include "we_op.hpp"
 #include "IO.hpp"
+#include "MpiWrapper.hpp"
 #include "seplib.h"
 
 typedef vecReg<data_t> vec;
@@ -13,12 +14,9 @@ typedef hypercube<data_t> hyper;
 int main(int argc, char **argv){
 
     int rank=0, size=1;
-#ifdef ENABLE_MPI
-    MPI_Init(&argc,&argv);
-    MPI_Comm_size(MPI_COMM_WORLD,&size);
-    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+    MpiWrapper::init(&argc,&argv);
+    MpiWrapper::setSizeRank(&size,&rank);
     fprintf (stderr,"\n====================\nSize of MPI communicator = %d ; current rank = %d\n====================\n",size,rank);
-#endif
 
     initpar(argc,argv);
 
@@ -27,7 +25,6 @@ int main(int argc, char **argv){
     readParameters(argc, argv, par);
     int verbose=par.verbose;
     if (rank>0) par.verbose=0;
-    par.device+=rank;
 
 // Set the maximum number of threads
     if (par.nthreads>0) omp_set_num_threads(par.nthreads);
@@ -87,20 +84,20 @@ int main(int argc, char **argv){
         delete op;
 
 // Copy to the full container
-        if (rank==0) memcpy(allrcv->getVals()+s*ns_cumul[s], rcv->getVals(),rcv->getN123()*sizeof(data_t));
-#ifdef ENABLE_MPI
-        if (rank==0) {
-            for (int task=1; task<size; task++) MPI_Recv(allrcv->getVals()+s*ns_cumul[s], rcv->getN123(), MPI_FLOAT, task, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        if (rank!=0) {
+            successCheck( MpiWrapper::send(rcv->getCVals(), rcv->getN123(), 0) , "MPI error\n");
         }
-        else MPI_Send(rcv->getN123(), rcv->getN123(), MPI_FLOAT, 0, MPI_ANY_TAG, MPI_COMM_WORLD);
-#endif
+        else{
+            for (int task=1; task<size; task++){
+                successCheck( MpiWrapper::recv(allrcv->getVals()+s*ns_cumul[s], rcv->getN123(), task) , "MPI error\n");
+            }
+            memcpy(allrcv->getVals()+s*ns_cumul[s], rcv->getCVals(),rcv->getN123()*sizeof(data_t));
+        }
     }
 
     if ((rank==0) && (output_file!="none")) write<data_t>(allrcv, output_file, par.format, par.datapath);
 
-#ifdef ENABLE_MPI
-    MPI_Finalize();
-#endif
-
+    MpiWrapper::finalize();
+    
 return 0;
 }

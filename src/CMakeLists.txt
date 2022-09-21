@@ -62,8 +62,8 @@ endif()
 add_executable(WE_MODELING_3D.x ${MAIN_DIR}/we_modeling.cpp)
 target_link_libraries(WE_MODELING_3D.x fwi3d sep)
 
-#add_executable(FWI3D.x ${MAIN_DIR}/fwi3d.cpp)
-#target_link_libraries(FWI3D.x fwi3d sep)
+add_executable(FWI3D.x ${MAIN_DIR}/fwi3d.cpp)
+target_link_libraries(FWI3D.x fwi3d sep)
 
 add_executable(BSPLINES3D.x ${MAIN_DIR}/bsplines3d.cpp)
 target_link_libraries(BSPLINES3D.x fwi3d sep)
@@ -75,7 +75,7 @@ install(FILES ${PYTHON}
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
         DESTINATION bin)
 install(TARGETS WE_MODELING_3D.x
-#                FWI3D.x
+                FWI3D.x
                 BSPLINES3D.x
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
         DESTINATION bin)

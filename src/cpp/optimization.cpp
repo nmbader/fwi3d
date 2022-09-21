@@ -20,11 +20,7 @@ void nlls_fwi::compute_res_and_grad(data_t * r, std::shared_ptr<vecReg<data_t> >
     data_t dt = _d->getHyper()->getAxis(1).d;
 
     int size=1, rank=0;
-#ifdef ENABLE_MPI
-MPI_Comm_size(MPI_COMM_WORLD,&size);
-MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-MPI_Barrier(MPI_COMM_WORLD);
-#endif
+    MpiWrapper::setSizeRank(&size,&rank);
 
     // cumulative number of traces
     std::vector<int> ntr_cumul(ns,0);
@@ -186,12 +182,9 @@ MPI_Barrier(MPI_COMM_WORLD);
 
     } // end of loop over shots
 
-#ifdef ENABLE_MPI
+
     // Sum all gradients
-    if (sizeof(data_t)==8) MPI_Allreduce(_pg->getVals(), _pg->getVals(), _pg->getN123(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    else MPI_Allreduce(_pg->getVals(), _pg->getVals(), _pg->getN123(), MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
-#endif
+    successCheck( MpiWrapper::allReduceSum(_pg->getVals(), _pg->getVals(), _pg->getN123()) , "MPI error\n");
 
     if (_P != nullptr) _P->jacobianT(false,_g,_m,_pg);
 

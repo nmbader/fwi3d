@@ -58,10 +58,8 @@ struct param{
     bool ls_version=0;
 
     // miscallenous
-    int device=0; // first gpu device to use
     int nthreads=0; // maximum number of threads to use in openMP
     int verbose=1; // logging level {0,1,2,3}
-    bool skip_mpi=false; // parameter to be used when running inversion with MPI
     bool format=0; // data format for read/write : SEP (0) or binary (1)
     std::string datapath="none"; // datapath for binary outputs
 };

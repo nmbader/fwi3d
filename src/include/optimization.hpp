@@ -6,6 +6,7 @@
 #include <time.h>
 #include "operator.hpp"
 #include "we_op.hpp"
+#include "MpiWrapper.hpp"
 
 #ifdef CUDA
     #include "cudaMisc.h"
@@ -266,13 +267,9 @@ public:
     virtual void res(){
         _r->zero();
         compute_res_and_grad(_r->getVals(), _g); _flag = true;
-#ifdef ENABLE_MPI
         // gather all residual
-        if (sizeof(data_t)==8) MPI_Allreduce(_r->getVals(), _r->getVals(), _r->getN123(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-        else MPI_Allreduce(_r->getVals(), _r->getVals(), _r->getN123(), MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-        MPI_Barrier(MPI_COMM_WORLD);
-#endif
-        }
+        successCheck( MpiWrapper::allReduceSum(_r->getCVals(), _r->getVals(), _r->getN123()) , "MPI error\n");
+    }
 
     virtual data_t getFunc(){
         if (_flag)
@@ -414,12 +411,10 @@ public:
         const data_t * pd = _d->getCVals();
         const data_t * pdmp = _Dmp->getCVals();
         compute_res_and_grad(_r->getVals(), _g);
-#ifdef ENABLE_MPI
+
         // gather all residual
-        if (sizeof(data_t)==8) MPI_Allreduce(_r->getVals(), _r->getVals(), _d->getN123(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-        else MPI_Allreduce(_r->getVals(), _r->getVals(), _d->getN123(), MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-        MPI_Barrier(MPI_COMM_WORLD);
-#endif
+        successCheck( MpiWrapper::allReduceSum(_r->getCVals(), _r->getVals(), _d->getN123()) , "MPI error\n");
+
         _D->apply_forward(false,_m->getCVals(),pr+nd);
         #pragma omp parallel for
         for (int i=0; i<nm; i++) pr[nd+i] = _lambda*(pr[nd+i] - pdmp[i]);

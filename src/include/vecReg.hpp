@@ -20,10 +20,6 @@
 #undef DOUBLE_PRECISION
 #endif
 
-#ifdef ENABLE_MPI
-    #include "mpi.h"
-#endif
-
 template <typename T1>
 class axis {
 public:

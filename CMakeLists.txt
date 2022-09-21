@@ -1,7 +1,7 @@
 #Required CMake version
 cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
 
-#Name of our cmake project
+#Name of cmake project
 project(fwi3d LANGUAGES CXX)
 
 
