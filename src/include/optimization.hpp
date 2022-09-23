@@ -180,6 +180,7 @@ protected:
     data_t _f; // objective function
     bool _flag; // flag to re-evaluate or not the objective function
     int _scale_source_times; // for source inversion by reduced Variable Projection
+    param _par; // parameters object for the non-linear WE operator
 
 public:
     std::vector <data_t> _dfunc; // vector that stores data objective function values for all trials (used in the regularization class)
@@ -187,8 +188,9 @@ public:
     std::vector<data_t> _scalers; // scalers applied to each source at a given trial
     nlls_fwi(){}
     virtual ~nlls_fwi(){}
-    nlls_fwi(nl_we_op * L, std::shared_ptr<vecReg<data_t> > m, std::shared_ptr<vecReg<data_t> > d, nloper * P = nullptr, std::shared_ptr<vecReg<data_t> > gmask = nullptr, std::shared_ptr<vecReg<data_t> > w = nullptr, std::shared_ptr<vecReg<data_t> > filter = nullptr){
+    nlls_fwi(nl_we_op * L, param &par, std::shared_ptr<vecReg<data_t> > m, std::shared_ptr<vecReg<data_t> > d, nloper * P = nullptr, std::shared_ptr<vecReg<data_t> > gmask = nullptr, std::shared_ptr<vecReg<data_t> > w = nullptr, std::shared_ptr<vecReg<data_t> > filter = nullptr){
         _L = L;
+        _par = par;
         _P = P;
         _m = m;
         _d = d;
@@ -199,7 +201,6 @@ public:
         _flag = true;
         initGrad();
         initRes();
-        d->setHyper(*L->getRange());
        
         // Model precconditioner (or parameterizer)
         if (P!= nullptr){
@@ -213,7 +214,6 @@ public:
             _p = _m;
             _pg = _g;
         }
-        successCheck(L->checkDomainRange(_p,d),"Vectors hypercube do not match the operator domain and range\n");
         if (gmask != nullptr) {
             successCheck(m->getN123()==gmask->getN123(),"The gradient mask and model vectors must have the same size\n");
             successCheck(gmask->min()>=0,"Gradient mask must be non-negative\n");
@@ -227,30 +227,30 @@ public:
 
         if (_filter != nullptr){ // apply filtering
             data_t eps=1e-07;
-            if (_L->_par.filter_phase=="zero") _filter = zero_phase(filter);
-            else if (_L->_par.filter_phase=="minimum") _filter = minimum_phase(filter,eps);
+            if (_par.filter_phase=="zero") _filter = zero_phase(filter);
+            else if (_par.filter_phase=="minimum") _filter = minimum_phase(filter,eps);
             axis<data_t> Tf = _filter->getHyper()->getAxis(1);
             axis<data_t> T = _d->getHyper()->getAxis(1);
             Tf.d=T.d;
             _filter->setHyper(hypercube<data_t>(Tf)); 
-            conv1dnd op(*_d->getHyper(), _filter, _L->_par.filter_phase!="minimum");
+            conv1dnd op(*_d->getHyper(), _filter, _par.filter_phase!="minimum");
             std::shared_ptr<vecReg<data_t> > output = std::make_shared<vecReg<data_t> >(*op.getRange());
             output->zero();
             op.forward(false,_d,output);
             _d=output;
         }
 
-        if (_L->_par.normalize) { // apply trace normalization
+        if (_par.normalize) { // apply trace normalization
             int nt=_d->getHyper()->getAxis(1).n;
             int ntr=_d->getN123()/nt;
             data_t * norms = new data_t[ntr];
             ttnormalize(_d->getVals(), norms, nt, ntr);
             delete [] norms;
         }
-        if (_L->_par.envelop==1) envelop1(_d); // compute the envelop (or envelop squared) of the data
-        else if (_L->_par.envelop==2) envelop2(_d);
+        if (_par.envelop==1) envelop1(_d); // compute the envelop (or envelop squared) of the data
+        else if (_par.envelop==2) envelop2(_d);
 
-        if (_L->_par.normalize_obj_func){
+        if (_par.normalize_obj_func){
             _dnorm = _d->norm2();
             _dnorm *= _d->getHyper()->getAxis(1).d;
             if (_dnorm<ZERO) _dnorm=1;
@@ -258,8 +258,8 @@ public:
         else _dnorm=1.0;
 
         _scale_source_times=0;
-        if (_L->_par.scale_source_times>0) {
-            for (int s=0; s<_L->_par.ns; s++) _scalers.push_back(1.0);
+        if (_par.scale_source_times>0) {
+            for (int s=0; s<_par.ns; s++) _scalers.push_back(1.0);
         }
     }
 
@@ -305,8 +305,9 @@ protected:
 public:
     nlls_fwi_reg(){}
     virtual ~nlls_fwi_reg(){}
-    nlls_fwi_reg(nl_we_op * L, nloper * D, std::shared_ptr<vecReg<data_t> > m, std::shared_ptr<vecReg<data_t> > d, data_t lambda, std::shared_ptr<vecReg<data_t> > mprior = nullptr, nloper * P = nullptr, std::shared_ptr<vecReg<data_t> > gmask = nullptr, std::shared_ptr<vecReg<data_t> > w = nullptr, std::shared_ptr<vecReg<data_t> > filter = nullptr){
+    nlls_fwi_reg(nl_we_op * L, param &par, nloper * D, std::shared_ptr<vecReg<data_t> > m, std::shared_ptr<vecReg<data_t> > d, data_t lambda, std::shared_ptr<vecReg<data_t> > mprior = nullptr, nloper * P = nullptr, std::shared_ptr<vecReg<data_t> > gmask = nullptr, std::shared_ptr<vecReg<data_t> > w = nullptr, std::shared_ptr<vecReg<data_t> > filter = nullptr){
         _L = L;
+        _par = par;
         _D = D;
         _P = P;
         _m = m;
@@ -319,7 +320,6 @@ public:
         _flag = true;
         initGrad();
         initRes();
-        d->setHyper(*L->getRange());
 
         _Dmp = std::make_shared<vecReg<data_t> > (*_D->getRange());
         _Dmp->zero();
@@ -339,7 +339,6 @@ public:
             _p = _m;
             _pg = _g;
         }
-        successCheck(L->checkDomainRange(_p,d),"Vectors hypercube do not match the operator domain and range\n");
         if (gmask != nullptr) {
             successCheck(m->getN123()==gmask->getN123(),"The gradient mask and model vectors must have the same size\n");
             successCheck(gmask->min()>=0,"Gradient mask must be non-negative\n");
@@ -353,28 +352,28 @@ public:
 
         if (_filter != nullptr){ // apply filtering
             data_t eps=1e-07;
-            if (_L->_par.filter_phase=="zero") _filter = zero_phase(filter);
-            else if (_L->_par.filter_phase=="minimum") _filter = minimum_phase(filter,eps);
+            if (_par.filter_phase=="zero") _filter = zero_phase(filter);
+            else if (_par.filter_phase=="minimum") _filter = minimum_phase(filter,eps);
             axis<data_t> Tf = _filter->getHyper()->getAxis(1);
             axis<data_t> T = _d->getHyper()->getAxis(1);
             Tf.d=T.d;
             _filter->setHyper(hypercube<data_t>(Tf)); 
-            conv1dnd op(*_d->getHyper(), _filter, _L->_par.filter_phase!="minimum");
+            conv1dnd op(*_d->getHyper(), _filter, _par.filter_phase!="minimum");
             std::shared_ptr<vecReg<data_t> > output = std::make_shared<vecReg<data_t> >(*op.getRange());
             output->zero();
             op.forward(false,_d,output);
             _d=output;
         }
 
-        if (_L->_par.normalize) {
+        if (_par.normalize) {
             int nt=_d->getHyper()->getAxis(1).n;
             int ntr=_d->getN123()/nt;
             data_t * norms = new data_t[ntr];
             ttnormalize(_d->getVals(), norms, nt, ntr);
             delete [] norms;
         }
-        if (_L->_par.envelop==1) envelop1(_d);
-        else if (_L->_par.envelop==2) envelop2(_d);
+        if (_par.envelop==1) envelop1(_d);
+        else if (_par.envelop==2) envelop2(_d);
 
         if (L->_par.normalize_obj_func){
             _dnorm = _d->norm2();
@@ -391,8 +390,8 @@ public:
         }
 
         _scale_source_times=0;
-        if (_L->_par.scale_source_times>0) {
-            for (int s=0; s<_L->_par.ns; s++) _scalers.push_back(1.0);
+        if (_par.scale_source_times>0) {
+            for (int s=0; s<_par.ns; s++) _scalers.push_back(1.0);
         }
     }
 
@@ -440,7 +439,7 @@ public:
             _f = fd+fm;
             _flag = false;
             
-            if (_L->_par.verbose>0) fprintf(stderr,"Data functional = %f; Model functional = %f\n",fd,fm);
+            if (_par.verbose>0) fprintf(stderr,"Data functional = %f; Model functional = %f\n",fd,fm);
             _dfunc.push_back(fd);
             _mfunc.push_back(fm);
         }

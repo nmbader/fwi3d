@@ -70,6 +70,10 @@ int main(int argc, char **argv){
     analyzeBsplines(*model->getHyper(),par);
     analyzeNLInversion(par);
 
+    ax axR(par.nr*par.nrcomp,0,1);
+    hyper range(src->getHyper()->getAxis(1), axR);
+    data->setHyper(range);
+
 // Build model precon if 1D inversion is activated
 // ----------------------------------------------------------------------------------------//
     std::shared_ptr<vec> model1d = model;
@@ -183,16 +187,12 @@ if (par.bsplines)
 // Build the appropriate operators
 // ----------------------------------------------------------------------------------------//
     
-    if (rank>0) par.verbose=verbose;
-
     nloper * op = nullptr;
     nl_we_op * L;
     if (par.nmodels==2) L=new nl_we_op_a(*model->getHyper(),allsrc,0,par);
     else if (par.nmodels==3) L=new nl_we_op_e(*model->getHyper(),allsrc,0,par);
     else if (par.nmodels==6) L=new nl_we_op_vti(*model->getHyper(),allsrc,0,par);
     else successCheck(false, "Number of paramaters in the model is not supported\n");
-
-    if (rank>0) par.verbose=0;
 
     if (par.bsplines)
     {
@@ -238,11 +238,15 @@ if (par.bsplines)
 // Construct the optimization problem, the solver, then solve the problem
 // ----------------------------------------------------------------------------------------//
 
+    par.verbose = verbose;
+
     nlls_fwi * prob;
     if (D != nullptr) {
-        prob = new nlls_fwi_reg(L, D, bsmodel, data, par.lambda, bsprior, op, bsmask, w, filter);
+        prob = new nlls_fwi_reg(L, par, D, bsmodel, data, par.lambda, bsprior, op, bsmask, w, filter);
     }
-    else prob = new nlls_fwi(L, bsmodel, data, op, bsmask, w, filter);
+    else prob = new nlls_fwi(L, par, bsmodel, data, op, bsmask, w, filter);
+
+    if (rank>0) par.verbose=0;
 
     lsearch * ls;
     if (par.lsearch=="weak_wolfe") ls = new weak_wolfe(par.ls_c1, par.ls_a0, par.ls_a1, par.ls_version);

@@ -68,7 +68,7 @@ int main(int argc, char **argv){
 // loop over shots
     for (int s=rank; s<par.ns; s+=size){
 
-        if (verbose>1) fprintf(stderr,"\nStart processing shot %d by process %d\n",s, rank);
+        if (verbose>1) fprintf(stderr,"\nStart modeling shot %d by process %d\n",s, rank);
 
 // Build the appropriate wave equation operator
         nl_we_op_e * op;

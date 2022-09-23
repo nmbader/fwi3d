@@ -15,7 +15,6 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
     hypercube<data_t> hyp(_p->getHyper()->getAxis(1),_p->getHyper()->getAxis(2),_p->getHyper()->getAxis(3),_p->getHyper()->getAxis(4));
     int ncxyz = hyp.getN123();
 
-    int ns = _L->_par.ns;
     int nt = _d->getHyper()->getAxis(1).n;
     data_t dt = _d->getHyper()->getAxis(1).d;
 
@@ -23,24 +22,27 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
     mpiWrapper::setSizeRank(&size,&rank);
 
     // cumulative number of traces
-    std::vector<int> ntr_cumul(ns,0);
+    std::vector<int> ntr_cumul(_par.ns,0);
     ntr_cumul[0]=0;
-    if (ns>1) ntr_cumul[1]=_L->_par.rxyz[0].size()*_L->_par.nrcomp;
-    for (int s=2; s<ns; s++) ntr_cumul[s] = ntr_cumul[s-1] + _L->_par.rxyz[s-1].size()*_L->_par.nrcomp;
+    if (_par.ns>1) ntr_cumul[1]=_par.rxyz[0].size()*_par.nrcomp;
+    for (int s=2; s<_par.ns; s++) ntr_cumul[s] = ntr_cumul[s-1] + _par.rxyz[s-1].size()*_par.nrcomp;
 
     time_t t = time(NULL);
-    if (_L->_par.verbose>0 && rank==0) fprintf(stderr,"\n====================\n%s\n====================\n",ctime(&t));
+    if (_par.verbose>0 && rank==0) fprintf(stderr,"\n====================\n%s\n====================\n",ctime(&t));
 
     // loop over shots
-    for (int s=rank; s<ns; s+=size)
+    for (int s=rank; s<_par.ns; s+=size)
     {
-        if (_L->_par.verbose>1) fprintf(stderr,"Modeling shot %d by process %d\n",s, rank);
+        if (_par.verbose>1) fprintf(stderr,"Modeling shot %d by process %d\n",s, rank);
 
         // Build the appropriate wave equation operator
+        int verbose = _par.verbose;
+        if (rank>0) _par.verbose=0;
         nl_we_op_e * L;
-        if (_L->_par.nmodels==2) L=new nl_we_op_a(hyp,_L->_allsrc,s,_L->_par);
-        if (_L->_par.nmodels==3) L=new nl_we_op_e(hyp,_L->_allsrc,s,_L->_par);
-        else if (_L->_par.nmodels==6) L=new nl_we_op_vti(hyp,_L->_allsrc,s,_L->_par);
+        if (_par.nmodels==2) L=new nl_we_op_a(hyp,_L->_allsrc,s,_par);
+        if (_par.nmodels==3) L=new nl_we_op_e(hyp,_L->_allsrc,s,_par);
+        else if (_par.nmodels==6) L=new nl_we_op_vti(hyp,_L->_allsrc,s,_par);
+        _par.verbose=verbose;
 
         std::shared_ptr<vecReg<data_t> > rcv = std::make_shared<vecReg<data_t> >(*L->getRange());
         rcv->zero();
@@ -48,7 +50,7 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
         L->apply_forward(false,_p->getVals(),rcv->getVals());
         data_t * pr = rcv->getVals();
 
-        if (_L->_par.verbose>1) fprintf(stderr,"Computing residual and adjoint sources for shot %d by process %d\n",s, rank);
+        if (_par.verbose>1) fprintf(stderr,"Computing residual and adjoint sources for shot %d by process %d\n",s, rank);
 
         if (_w != nullptr) {
             data_t * pw = _w->getVals()+ntr_cumul[s]*nt;
@@ -58,7 +60,7 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
 
         if (_filter != nullptr){
             data_t eps=1e-07;
-            conv1dnd op(*rcv->getHyper(), _filter, _L->_par.filter_phase!="minimum");
+            conv1dnd op(*rcv->getHyper(), _filter, _par.filter_phase!="minimum");
             std::shared_ptr<vecReg<data_t> > output = std::make_shared<vecReg<data_t> >(*op.getRange());
             output->zero();
             op.forward(false,rcv,output);
@@ -68,8 +70,8 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
 
         // rescale the synthetics by u'd/u'u (equivalent to Variable Projection with the variable being a single scaler multiplying the source time function)
         data_t * pd = _d->getVals()+ntr_cumul[s]*nt;
-        if (_L->_par.scale_source_times>0){
-            if (_L->_par.scale_source_times>_scale_source_times){
+        if (_par.scale_source_times>0){
+            if (_par.scale_source_times>_scale_source_times){
                 data_t scaler1=0;
                 data_t scaler2=0;
                 // first component
@@ -79,24 +81,24 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
                     scaler2 += pr[i]*pr[i];
                 }
                 _scalers[s] = scaler1/scaler2;
-                if (std::abs(std::log(_scalers[s]))>_L->_par.scale_source_log_clip) _scalers[s]=std::exp(((_scalers[s]>=1) - (_scalers[s]<1))*_L->_par.scale_source_log_clip);
+                if (std::abs(std::log(_scalers[s]))>_par.scale_source_log_clip) _scalers[s]=std::exp(((_scalers[s]>=1) - (_scalers[s]<1))*_par.scale_source_log_clip);
             }
             rcv->scale(_scalers[s]);
-            if (_L->_par.verbose>0) fprintf(stderr,"Shot %d rescaled by a factor of %f\n",s,_scalers[s]);
+            if (_par.verbose>0) fprintf(stderr,"Shot %d rescaled by a factor of %f\n",s,_scalers[s]);
         }
 
         std::shared_ptr<vecReg<data_t> > norms;
         std::shared_ptr<vecReg<data_t> > syn1;
-        if (_L->_par.normalize){
+        if (_par.normalize){
             norms = std::make_shared<vecReg<data_t> >(hypercube<data_t>(ntr));
             syn1 = rcv->clone();
             ttnormalize(rcv->getVals(), norms->getVals(), nt, ntr);
         }
 
         std::shared_ptr<vecReg<data_t> > syn2;
-        if (_L->_par.envelop != 0){
+        if (_par.envelop != 0){
             syn2 = rcv->clone();
-            if (_L->_par.envelop==1) envelop1(rcv);
+            if (_par.envelop==1) envelop1(rcv);
             else envelop2(rcv);
         }
 
@@ -112,13 +114,13 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
         // compute the gradient per shot
         applyHt(false, false, pr, pr, ntr, nt, dt, 0, ntr);
 
-        if (_L->_par.envelop != 0){
+        if (_par.envelop != 0){
             std::shared_ptr<vecReg<data_t> > temp = syn2->clone();
             hilbert(temp);
             std::shared_ptr<vecReg<data_t> > temp2;
             data_t * ptemp = temp->getVals();
             data_t * psyn = syn2->getVals();
-            if (_L->_par.envelop==1) {
+            if (_par.envelop==1) {
                 temp2 = temp->clone();
                 data_t * ptemp2 = temp2->getVals();
                 for (int i=0; i<temp->getN123(); i++) {
@@ -131,7 +133,7 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
             }
             hilbert(temp);
             ptemp = temp->getVals();
-            if (_L->_par.envelop==1) {
+            if (_par.envelop==1) {
                 data_t * ptemp2 = temp2->getVals();
                 for (int i=0; i<temp->getN123(); i++) pr[i] = psyn[i]/ptemp2[i] * pr[i] - ptemp[i];
             }
@@ -140,7 +142,7 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
             }
         }
 
-        if (_L->_par.normalize){
+        if (_par.normalize){
             data_t * psyn = syn1->getVals();
             data_t * pnorm = norms->getVals();
             for (int ix=0; ix<ntr; ix++){
@@ -159,7 +161,7 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
 
         if (_filter != nullptr){
             data_t eps=1e-07;
-            conv1dnd op(*rcv->getHyper(), _filter, _L->_par.filter_phase!="minimum");
+            conv1dnd op(*rcv->getHyper(), _filter, _par.filter_phase!="minimum");
             std::shared_ptr<vecReg<data_t> > output = std::make_shared<vecReg<data_t> >(*op.getDomain());
             output->zero();
             op.adjoint(false,output,rcv);
@@ -176,13 +178,13 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
 
         rcv->scale(1.0/_dnorm);
 
-        if (_L->_par.verbose>1) fprintf(stderr,"Computing gradient for shot %d by process %d\n",s, rank);
+        if (_par.verbose>1) fprintf(stderr,"Computing gradient for shot %d by process %d\n",s, rank);
 
         L->apply_jacobianT(true,_pg->getVals(),_p->getVals(),rcv->getVals());
 
         delete L;
 
-        if (_L->_par.verbose>1) fprintf(stderr,"Finish processing shot %d by process %d\n",s, rank);
+        if (_par.verbose>1) fprintf(stderr,"Finish processing shot %d by process %d\n",s, rank);
 
     } // end of loop over shots
 
@@ -194,7 +196,7 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
 
     if (_gmask != nullptr) _g->mult(_gmask);
 
-    if (_L->_par.scale_source_times>0) _scale_source_times++;
+    if (_par.scale_source_times>0) _scale_source_times++;
 }
 
 #undef ZERO
