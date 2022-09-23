@@ -1,7 +1,7 @@
 #include <string.h>
 #include "we_op.hpp"
 #include "IO.hpp"
-#include "MpiWrapper.hpp"
+#include "mpiWrapper.hpp"
 #include "seplib.h"
 
 typedef vecReg<data_t> vec;
@@ -14,8 +14,8 @@ typedef hypercube<data_t> hyper;
 int main(int argc, char **argv){
 
     int rank=0, size=1;
-    MpiWrapper::init(&argc,&argv);
-    MpiWrapper::setSizeRank(&size,&rank);
+    mpiWrapper::init(&argc,&argv);
+    mpiWrapper::setSizeRank(&size,&rank);
     fprintf (stderr,"\n====================\nSize of MPI communicator = %d ; current rank = %d\n====================\n",size,rank);
 
     initpar(argc,argv);
@@ -57,22 +57,25 @@ int main(int argc, char **argv){
     ax R(par.nr*par.nrcomp,0,1);
     if (rank==0) allrcv = std::make_shared<vec> (hyper(T,R));
 
-// cumulative number of samples
-    std::vector<int> ns_cumul(par.ns,0);
-    ns_cumul[0]=0;
-    if (par.ns>1) ns_cumul[1]=par.rxyz[0].size()*par.nrcomp*T.n;
-    for (int s=2; s<par.ns; s++) ns_cumul[s] = ns_cumul[s-1] + par.rxyz[s-1].size()*par.nrcomp*T.n;
+// cumulative number of traces
+    std::vector<int> ntr_cumul(par.ns,0);
+    ntr_cumul[0]=0;
+    if (par.ns>1) ntr_cumul[1]=par.rxyz[0].size()*par.nrcomp;
+    for (int s=2; s<par.ns; s++) ntr_cumul[s] = ntr_cumul[s-1] + par.rxyz[s-1].size()*par.nrcomp;
+
+    mpiWrapper::barrier();
 
 // loop over shots
     for (int s=rank; s<par.ns; s+=size){
 
-        if (verbose>1) fprintf(stderr,"Start processing shot %d by process %d\n",s, rank);
+        if (verbose>1) fprintf(stderr,"\nStart processing shot %d by process %d\n",s, rank);
 
 // Build the appropriate wave equation operator
         nl_we_op_e * op;
         if (par.nmodels==2) op=new nl_we_op_a(*model->getHyper(),allsrc,s,par);
-        if (par.nmodels==3) op=new nl_we_op_e(*model->getHyper(),allsrc,s,par);
+        else if (par.nmodels==3) op=new nl_we_op_e(*model->getHyper(),allsrc,s,par);
         else if (par.nmodels==6) op=new nl_we_op_vti(*model->getHyper(),allsrc,s,par);
+        else successCheck(false, "Number of paramaters in the model is not supported\n");
 
 // Run the forward modeling
         std::shared_ptr<vec> rcv = std::make_shared<vec> (*op->getRange());
@@ -85,19 +88,19 @@ int main(int argc, char **argv){
 
 // Copy to the full container
         if (rank!=0) {
-            successCheck( MpiWrapper::send(rcv->getCVals(), rcv->getN123(), 0) , "MPI error\n");
+            mpiWrapper::send(rcv->getCVals(), rcv->getN123(), 0, rank);
         }
-        else{
-            for (int task=1; task<size; task++){
-                successCheck( MpiWrapper::recv(allrcv->getVals()+s*ns_cumul[s], rcv->getN123(), task) , "MPI error\n");
+        else {
+            for (int task=1; task<size && task<par.ns; task++){
+                mpiWrapper::recv(allrcv->getVals()+ntr_cumul[s+task]*T.n, par.rxyz[s+task].size()*par.nrcomp*T.n, task, task);
             }
-            memcpy(allrcv->getVals()+s*ns_cumul[s], rcv->getCVals(),rcv->getN123()*sizeof(data_t));
+            memcpy(allrcv->getVals()+ntr_cumul[s]*T.n, rcv->getCVals(),rcv->getN123()*sizeof(data_t));
         }
-    }
+    } // end loop over shots
 
     if ((rank==0) && (output_file!="none")) write<data_t>(allrcv, output_file, par.format, par.datapath);
 
-    MpiWrapper::finalize();
+    mpiWrapper::finalize();
     
 return 0;
 }

@@ -625,7 +625,6 @@ public:
 class conv1dnd : public loper {
 protected:
     std::shared_ptr<vecReg<data_t> > _f; // filter always treated as 1D
-//    bool _frequency; // perform convolution in time or frequency domain
     bool _centered; // center the convolution
 
 public:

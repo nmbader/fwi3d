@@ -2,6 +2,7 @@
 #include "nlsolver.hpp"
 #include "IO.hpp"
 #include "misc.hpp"
+#include "mpiWrapper.hpp"
 
 #define ZERO 1e-10
 #define STOL 1e-3
@@ -705,10 +706,8 @@ void nlsolver::testParaboloid(const bool verbose){
 
 void nlsd::run(optimization * prob, const bool verbose, std::string output, int isave, int format, std::string datapath){
 
-int rank=0;
-#ifdef ENABLE_MPI
-    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-#endif
+    int rank=0, size=1;
+    mpiWrapper::setSizeRank(&size,&rank);
     
     reset();
 
@@ -760,9 +759,9 @@ fprintf(stderr,"################################################################
             _geval++;
             gnorm=g->norm();
             if (output!="none" && k==0 && isave!=0 && rank==0){
-                write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-                write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-                write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
             }
         }
 
@@ -793,15 +792,15 @@ fprintf(stderr,"################################################################
         k++;
 
         if (output!="none" && k % isave==0 && rank==0){
-            write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-            write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-            write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
         }
     }
     if (output!="none" && k % isave!=0 && rank==0){
-        write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-        write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-        write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
     }
 
 if (verbose){
@@ -815,10 +814,8 @@ if (verbose){
 
 void nlcg::run(optimization * prob, const bool verbose, std::string output, int isave, int format, std::string datapath){
 
-int rank=0;
-#ifdef ENABLE_MPI
-    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-#endif
+    int rank=0, size=1;
+    mpiWrapper::setSizeRank(&size,&rank);
 
     reset();
 
@@ -877,9 +874,9 @@ fprintf(stderr,"################################################################
             _geval++;
             gnorm=g->norm();
             if (output!="none" && k==0 && isave!=0 && rank==0){
-                write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-                write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-                write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
             }
         }
 
@@ -927,15 +924,15 @@ fprintf(stderr,"################################################################
         k++;
 
         if (output!="none" && k % isave==0 && rank==0){
-            write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-            write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-            write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
         }
     }
     if (output!="none" && k % isave!=0 && rank==0){
-        write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-        write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-        write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
     }
 
 if (verbose){
@@ -949,10 +946,8 @@ if (verbose){
 
 void bfgs::run(optimization * prob, const bool verbose, std::string output, int isave, int format, std::string datapath){
 
-int rank=0;
-#ifdef ENABLE_MPI
-    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-#endif
+    int rank=0, size=1;
+    mpiWrapper::setSizeRank(&size,&rank);
 
     reset();
 
@@ -1018,9 +1013,9 @@ fprintf(stderr,"################################################################
             _geval++;
             gnorm=g->norm();
             if (output!="none" && k==0 && isave!=0 && rank==0){
-                write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-                write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-                write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
             }
         }
 
@@ -1071,15 +1066,15 @@ fprintf(stderr,"################################################################
         k++;
 
         if (output!="none" && k % isave==0 && rank==0){
-            write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-            write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-            write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
         }
     }
     if (output!="none" && k % isave!=0 && rank==0){
-        write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-        write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-        write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
     }
 
 if (verbose){
@@ -1162,10 +1157,8 @@ void bfgs::updateH(matrix * H ,std::shared_ptr<vecReg<data_t> > s, std::shared_p
 
 void lbfgs::run(optimization * prob, const bool verbose, std::string output, int isave, int format, std::string datapath){
 
-int rank=0;
-#ifdef ENABLE_MPI
-    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-#endif
+    int rank=0, size=1;
+    mpiWrapper::setSizeRank(&size,&rank);
 
     reset();
 
@@ -1230,9 +1223,9 @@ fprintf(stderr,"################################################################
             _geval++;
             gnorm=g->norm();
             if (output!="none" && k==0 && isave!=0 && rank==0){
-                write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-                write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-                write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
             }
         }
 
@@ -1276,15 +1269,15 @@ fprintf(stderr,"################################################################
         k++;
 
         if (output!="none" && k % isave==0 && rank==0){
-            write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-            write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-            write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
         }
     }
     if (output!="none" && k % isave!=0 && rank==0){
-        write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-        write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-        write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
     }
 
 if (verbose){
@@ -1367,10 +1360,8 @@ void lbfgs::computeHg(std::shared_ptr<vecReg<data_t> > &p, std::shared_ptr<vecRe
 
 void newton::run(optimization * prob, const bool verbose, std::string output, int isave, int format, std::string datapath){
 
-int rank=0;
-#ifdef ENABLE_MPI
-    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-#endif
+    int rank=0, size=1;
+    mpiWrapper::setSizeRank(&size,&rank);
 
     reset();
 
@@ -1427,9 +1418,9 @@ fprintf(stderr,"################################################################
             _geval++;
             gnorm=g->norm();
             if (output!="none" && k==0 && isave!=0 && rank==0){
-                write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-                write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-                write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+                write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
             }
         }
 
@@ -1473,15 +1464,15 @@ fprintf(stderr,"################################################################
         k++;
 
         if (output!="none" && k % isave==0 && rank==0){
-            write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-            write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-            write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+            write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
         }
     }
     if (output!="none" && k % isave!=0 && rank==0){
-        write(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
-        write(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
-        write(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(m,output+"model_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(g,output+"gradient_iter_"+std::to_string(k)+".H", format, datapath);
+        write<data_t>(prob->getRes(),output+"residual_iter_"+std::to_string(k)+".H", format, datapath);
     }
 
 if (verbose){

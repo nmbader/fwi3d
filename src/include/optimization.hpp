@@ -6,7 +6,7 @@
 #include <time.h>
 #include "operator.hpp"
 #include "we_op.hpp"
-#include "MpiWrapper.hpp"
+#include "mpiWrapper.hpp"
 
 #ifdef CUDA
     #include "cudaMisc.h"
@@ -199,6 +199,7 @@ public:
         _flag = true;
         initGrad();
         initRes();
+        d->setHyper(*L->getRange());
        
         // Model precconditioner (or parameterizer)
         if (P!= nullptr){
@@ -262,13 +263,13 @@ public:
         }
     }
 
-    void compute_res_and_grad(data_t * r, std::shared_ptr<vecReg<data_t> > g);
+    void compute_res_and_grad(data_t * r);
 
     virtual void res(){
         _r->zero();
-        compute_res_and_grad(_r->getVals(), _g); _flag = true;
+        compute_res_and_grad(_r->getVals()); _flag = true;
         // gather all residual
-        successCheck( MpiWrapper::allReduceSum(_r->getCVals(), _r->getVals(), _r->getN123()) , "MPI error\n");
+        mpiWrapper::allReduceSum(_r->getCVals(), _r->getVals(), _r->getN123());
     }
 
     virtual data_t getFunc(){
@@ -318,6 +319,7 @@ public:
         _flag = true;
         initGrad();
         initRes();
+        d->setHyper(*L->getRange());
 
         _Dmp = std::make_shared<vecReg<data_t> > (*_D->getRange());
         _Dmp->zero();
@@ -410,10 +412,10 @@ public:
         data_t * pr = _r->getVals();
         const data_t * pd = _d->getCVals();
         const data_t * pdmp = _Dmp->getCVals();
-        compute_res_and_grad(_r->getVals(), _g);
+        compute_res_and_grad(_r->getVals());
 
         // gather all residual
-        successCheck( MpiWrapper::allReduceSum(_r->getCVals(), _r->getVals(), _d->getN123()) , "MPI error\n");
+        mpiWrapper::allReduceSum(_r->getCVals(), _r->getVals(), _d->getN123());
 
         _D->apply_forward(false,_m->getCVals(),pr+nd);
         #pragma omp parallel for

@@ -3,7 +3,7 @@
 #include "bsplines.hpp"
 #include "nlsolver.hpp"
 #include "IO.hpp"
-#include "MpiWrapper.hpp"
+#include "mpiWrapper.hpp"
 #include "seplib.h"
 
 typedef vecReg<data_t> vec;
@@ -16,8 +16,8 @@ typedef hypercube<data_t> hyper;
 int main(int argc, char **argv){
 
     int rank=0, size=1;
-    MpiWrapper::init(&argc,&argv);
-    MpiWrapper::setSizeRank(&size,&rank);
+    mpiWrapper::init(&argc,&argv);
+    mpiWrapper::setSizeRank(&size,&rank);
     fprintf (stderr,"\n====================\nSize of MPI communicator = %d ; current rank = %d\n====================\n",size,rank);
     
     initpar(argc,argv);
@@ -48,13 +48,19 @@ int main(int argc, char **argv){
     std::shared_ptr<vec> data = read<data_t>(data_file, par.format);
     std::shared_ptr<vec> model = read<data_t>(model_file, par.format);
 
+    successCheck( src->getHyper()->getAxis(1).n==data->getHyper()->getAxis(1).n
+                && src->getHyper()->getAxis(1).d==data->getHyper()->getAxis(1).d,
+                "source wavelet(s) and data must have the same number of time samples and sampling rate\n" );
+
     std::shared_ptr<vec> hrz = nullptr;
     std::shared_ptr<vec> gmask = nullptr;
     std::shared_ptr<vec> w = nullptr;
+    std::shared_ptr<vec> filter = nullptr;
     std::shared_ptr<vec> invDiagH = nullptr;
     std::shared_ptr<vec> prior = nullptr;
     if (par.mask_file!="none") {gmask = read<data_t>(par.mask_file, par.format); successCheck(gmask->getN123()==model->getN123(),"Gradient mask must have the same number of samples as the model\n");}
     if (par.weights_file!="none") {w = read<data_t>(par.weights_file, par.format); successCheck(w->getN123()==data->getN123(),"Data weights must have the same number of samples as the data\n");}
+    if (par.filter_file!="none") {filter = read<data_t>(par.filter_file, par.format); successCheck(filter->getHyper()->getAxis(1).d==data->getHyper()->getAxis(1).d,"Filter and data must have the same sampling rate\n");}
     if (par.inverse_diagonal_hessian_file!="none") {invDiagH = read<data_t>(par.inverse_diagonal_hessian_file, par.format); successCheck(invDiagH->getN123()==model->getN123(),"Inverse diagonal Hessian must have the same number of samples as the model\n");}
     if (par.prior_file!="none") {prior = read<data_t>(par.prior_file, par.format); successCheck(prior->getN123()==model->getN123(),"Prior model must have the same number of samples as the model\n");}
 
@@ -182,8 +188,9 @@ if (par.bsplines)
     nloper * op = nullptr;
     nl_we_op * L;
     if (par.nmodels==2) L=new nl_we_op_a(*model->getHyper(),allsrc,0,par);
-    if (par.nmodels==3) L=new nl_we_op_e(*model->getHyper(),allsrc,0,par);
+    else if (par.nmodels==3) L=new nl_we_op_e(*model->getHyper(),allsrc,0,par);
     else if (par.nmodels==6) L=new nl_we_op_vti(*model->getHyper(),allsrc,0,par);
+    else successCheck(false, "Number of paramaters in the model is not supported\n");
 
     if (rank>0) par.verbose=0;
 
@@ -228,14 +235,14 @@ if (par.bsplines)
     }
 // ----------------------------------------------------------------------------------------//
 
-// Construct the optimiization problem, the solver, then solve the problem
+// Construct the optimization problem, the solver, then solve the problem
 // ----------------------------------------------------------------------------------------//
 
     nlls_fwi * prob;
     if (D != nullptr) {
-        prob = new nlls_fwi_reg(L, D, bsmodel, data, par.lambda, bsprior, op, bsmask, w);
+        prob = new nlls_fwi_reg(L, D, bsmodel, data, par.lambda, bsprior, op, bsmask, w, filter);
     }
-    else prob = new nlls_fwi(L, bsmodel, data, op, bsmask, w);
+    else prob = new nlls_fwi(L, bsmodel, data, op, bsmask, w, filter);
 
     lsearch * ls;
     if (par.lsearch=="weak_wolfe") ls = new weak_wolfe(par.ls_c1, par.ls_a0, par.ls_a1, par.ls_version);
@@ -265,21 +272,21 @@ if (par.bsplines)
     if (rank==0 && obj_func_file!="none") {
         std::shared_ptr<vec > func = std::make_shared<vec > (hyper(solver->_func.size()));
         memcpy(func->getVals(), solver->_func.data(), solver->_func.size()*sizeof(data_t));
-        write(func,obj_func_file, par.format, par.datapath);
+        write<data_t>(func,obj_func_file, par.format, par.datapath);
         if (D != nullptr){
             std::shared_ptr<vec > dfunc = std::make_shared<vec > (hyper(prob->_dfunc.size()));
             std::shared_ptr<vec > mfunc = std::make_shared<vec > (hyper(prob->_mfunc.size()));
             memcpy(dfunc->getVals(), prob->_dfunc.data(), prob->_dfunc.size()*sizeof(data_t));
             memcpy(mfunc->getVals(), prob->_mfunc.data(), prob->_mfunc.size()*sizeof(data_t));
-            write(dfunc,obj_func_file+".d", par.format, par.datapath);
-            write(mfunc,obj_func_file+".m", par.format, par.datapath);
+            write<data_t>(dfunc,obj_func_file+".d", par.format, par.datapath);
+            write<data_t>(mfunc,obj_func_file+".m", par.format, par.datapath);
         }
     }
 
     delete L;
     delete prob;
 
-    MpiWrapper::finalize();
+    mpiWrapper::finalize();
 // ----------------------------------------------------------------------------------------//
 
 return 0;

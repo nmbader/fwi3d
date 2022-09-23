@@ -568,7 +568,7 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
         }
 
         // compute FWI gradients except for first and last time samples
-        if ((grad != nullptr) && (it%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, it/par.sub, dx, dy, dz, par.sub*par.dt);
+        if ((grad != nullptr) && (par.sub>0) && (it%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, it/par.sub, dx, dy, dz, par.sub*par.dt);
 
         // apply spatial SBP operators
         Dxx_var<mu>(false, curr[0], next[0], nx, ny, nz, dx, 0, nx, 0, ny, 0, nz, mod, 2.0);
@@ -777,7 +777,7 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
     }
 
     // last sample gradient
-    if ((grad != nullptr) && ((par.nt-1)%par.sub==0) ) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, (par.nt-1)/par.sub, dx, dy, dz, par.sub*par.dt);
+    if ((grad != nullptr) && (par.sub>0) && ((par.nt-1)%par.sub==0) ) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, (par.nt-1)/par.sub, dx, dy, dz, par.sub*par.dt);
     
     delete [] u;
     delete [] dux;
@@ -1178,7 +1178,7 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
         }
 
         // compute FWI gradients except for first and last time samples
-        if ((grad != nullptr) && (it%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, it/par.sub, dx, dy, dz, par.sub*par.dt);
+        if ((grad != nullptr) && (par.sub>0) && (it%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, it/par.sub, dx, dy, dz, par.sub*par.dt);
 
         // apply spatial SBP operators
         Dxx_var<c11b>(false, curr[0], next[0], nx, ny, nz, dx, 0, nx, 0, ny, 0, nz, mod, 1.0);
@@ -1397,7 +1397,7 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
     }
 
     // last sample gradient
-    if ((grad != nullptr) && ((par.nt-1)%par.sub==0) ) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, (par.nt-1)/par.sub, dx, dy, dz, par.sub*par.dt);
+    if ((grad != nullptr) && (par.sub>0) && ((par.nt-1)%par.sub==0) ) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, (par.nt-1)/par.sub, dx, dy, dz, par.sub*par.dt);
     
     delete [] u;
     delete [] dux;
@@ -1512,7 +1512,7 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
         }
 
         // compute FWI gradients except for first and last time samples
-        if ((grad != nullptr) && (it%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], tmp, grad, par, nx, ny, nz, it/par.sub, dx, dy, dz, par.sub*par.dt);
+        if ((grad != nullptr) && (par.sub>0) && (it%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], tmp, grad, par, nx, ny, nz, it/par.sub, dx, dy, dz, par.sub*par.dt);
 
         // apply spatial SBP operators
         // mu here designates the second model parameter, i.e. reciprocal of density 1/rho 

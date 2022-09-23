@@ -40,6 +40,7 @@ set(HEADERS ${INC_DIR}/injector.hpp
                 ${INC_DIR}/vecReg.hpp
                 ${INC_DIR}/we_op.hpp
                 ${INC_DIR}/bsplines.hpp
+                ${INC_DIR}/mpiWrapper.hpp
         )
 
 set(PYTHON ${PYTHON_DIR}/seppy.py
@@ -79,3 +80,14 @@ install(TARGETS WE_MODELING_3D.x
                 BSPLINES3D.x
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
         DESTINATION bin)
+
+
+# For development purposes
+if (DEV)
+        add_executable(TEST_FD.x ${DEV_DIR}/test_fd.cpp)
+        target_link_libraries(TEST_FD.x fwi3d sep)
+
+        install(TARGETS TEST_FD.x
+        PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
+        DESTINATION bin)
+endif()

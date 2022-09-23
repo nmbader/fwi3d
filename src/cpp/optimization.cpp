@@ -2,7 +2,7 @@
 
 #define ZERO 1e-16
 
-void nlls_fwi::compute_res_and_grad(data_t * r, std::shared_ptr<vecReg<data_t> > g){       
+void nlls_fwi::compute_res_and_grad(data_t * r){       
 
     _g->zero();
 
@@ -20,7 +20,7 @@ void nlls_fwi::compute_res_and_grad(data_t * r, std::shared_ptr<vecReg<data_t> >
     data_t dt = _d->getHyper()->getAxis(1).d;
 
     int size=1, rank=0;
-    MpiWrapper::setSizeRank(&size,&rank);
+    mpiWrapper::setSizeRank(&size,&rank);
 
     // cumulative number of traces
     std::vector<int> ntr_cumul(ns,0);
@@ -34,7 +34,7 @@ void nlls_fwi::compute_res_and_grad(data_t * r, std::shared_ptr<vecReg<data_t> >
     // loop over shots
     for (int s=rank; s<ns; s+=size)
     {
-        if (_L->_par.verbose>1) fprintf(stderr,"Start processing shot %d by process %d\n",s, rank);
+        if (_L->_par.verbose>1) fprintf(stderr,"Modeling shot %d by process %d\n",s, rank);
 
         // Build the appropriate wave equation operator
         nl_we_op_e * L;
@@ -47,6 +47,8 @@ void nlls_fwi::compute_res_and_grad(data_t * r, std::shared_ptr<vecReg<data_t> >
         int ntr = rcv->getN123()/nt;
         L->apply_forward(false,_p->getVals(),rcv->getVals());
         data_t * pr = rcv->getVals();
+
+        if (_L->_par.verbose>1) fprintf(stderr,"Computing residual and adjoint sources for shot %d by process %d\n",s, rank);
 
         if (_w != nullptr) {
             data_t * pw = _w->getVals()+ntr_cumul[s]*nt;
@@ -174,6 +176,8 @@ void nlls_fwi::compute_res_and_grad(data_t * r, std::shared_ptr<vecReg<data_t> >
 
         rcv->scale(1.0/_dnorm);
 
+        if (_L->_par.verbose>1) fprintf(stderr,"Computing gradient for shot %d by process %d\n",s, rank);
+
         L->apply_jacobianT(true,_pg->getVals(),_p->getVals(),rcv->getVals());
 
         delete L;
@@ -184,7 +188,7 @@ void nlls_fwi::compute_res_and_grad(data_t * r, std::shared_ptr<vecReg<data_t> >
 
 
     // Sum all gradients
-    successCheck( MpiWrapper::allReduceSum(_pg->getVals(), _pg->getVals(), _pg->getN123()) , "MPI error\n");
+    mpiWrapper::allReduceSum(_pg->getVals(), _pg->getVals(), _pg->getN123());
 
     if (_P != nullptr) _P->jacobianT(false,_g,_m,_pg);
 

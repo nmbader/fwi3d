@@ -1,22 +1,21 @@
 #pragma once
 
+#include <iostream>
 #include "vecReg.hpp"
 #ifdef ENABLE_MPI
     #include "mpi.h"
 #endif
 
-struct MpiWrapper
+struct mpiWrapper
 {
 public:
 
-    MpiWrapper() = delete;
+    mpiWrapper() = delete;
 
-    static int init( int * argc, char *** argv ){
+    static void init( int * argc, char *** argv ){
 
 #ifdef ENABLE_MPI
-    return MPI_Init(argc,argv);
-#else
-    return 1;
+    MPI_Init(argc,argv);
 #endif        
     }
 
@@ -38,49 +37,49 @@ public:
 #endif
     }
 
-    static int send(const data_t * pin, int n, int recipient){
+    static void barrier(){
 
 #ifdef ENABLE_MPI
-        MPI_Datatype mpi_type = MPI_FLOAT;
-        if (sizeof(data_t) == 8) mpi_type = MPI_DOUBLE;
-        return MPI_Send(pin, n, mpi_type, recipient, MPI_ANY_TAG, MPI_COMM_WORLD);
-#else
-        return 1;
+    MPI_Barrier(MPI_COMM_WORLD);
 #endif
     }
 
-    static int recv(data_t * pout, int n, int sender){
+    static void send(const data_t * pin, int n, int recipient, int tag){
 
 #ifdef ENABLE_MPI
         MPI_Datatype mpi_type = MPI_FLOAT;
         if (sizeof(data_t) == 8) mpi_type = MPI_DOUBLE;
-        return MPI_Recv(pout, n, mpi_type, sender, MPI_ANY_TAG, MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-#else
-        return 1;
+        MPI_Send(pin, n, mpi_type, recipient, tag, MPI_COMM_WORLD);
 #endif
     }
 
-    static int gather(const data_t * pin, data_t * pout, int n){
+    static void recv(data_t * pout, int n, int sender, int tag){
 
 #ifdef ENABLE_MPI
         MPI_Datatype mpi_type = MPI_FLOAT;
         if (sizeof(data_t) == 8) mpi_type = MPI_DOUBLE;
-        return MPI_Gather(pin, n, mpi_type, pout, n, mpi_type, 0, MPI_COMM_WORLD);
+        MPI_Recv(pout, n, mpi_type, sender, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+#endif
+    }
+
+    static void gather(const data_t * pin, data_t * pout, int n){
+
+#ifdef ENABLE_MPI
+        MPI_Datatype mpi_type = MPI_FLOAT;
+        if (sizeof(data_t) == 8) mpi_type = MPI_DOUBLE;
+        MPI_Gather(pin, n, mpi_type, pout, n, mpi_type, 0, MPI_COMM_WORLD);
 #else
         memcpy(pout, pin, n*sizeof(data_t));
-        return 1;
 #endif
     }
 
-    static int allReduceSum(const data_t * pin, data_t * pout, int n){
+    static void allReduceSum(const data_t * pin, data_t * pout, int n){
 
 #ifdef ENABLE_MPI
         MPI_Datatype mpi_type = MPI_FLOAT;
         if (sizeof(data_t) == 8) mpi_type = MPI_DOUBLE;
-        if (pin==pout) return MPI_Allreduce(MPI_IN_PLACE, pout, n, mpi_type, MPI_SUM, MPI_COMM_WORLD); 
-        else return MPI_Allreduce(pin, pout, n, mpi_type, MPI_SUM, MPI_COMM_WORLD);
-#else
-        return 1;
+        if (pin==pout) MPI_Allreduce(MPI_IN_PLACE, pout, n, mpi_type, MPI_SUM, MPI_COMM_WORLD); 
+        else MPI_Allreduce(pin, pout, n, mpi_type, MPI_SUM, MPI_COMM_WORLD);
 #endif
     }
 };
