@@ -40,13 +40,11 @@ int main(int argc, char **argv){
     successCheck(model_file!="none","Earth model is not provided\n");
 
     std::shared_ptr<vec> src = read<data_t>(source_file, par.format);
-    std::shared_ptr<vec> model = read<data_t>(model_file, par.format);
+    std::shared_ptr<vec> model = read<data_t>(model_file, par.format, 4);
     
 // Analyze the input source time function and duplicate if necessary, analyze geometry
     analyzeGeometry(*model->getHyper(),par, par.verbose>0);
     std::shared_ptr<vec> allsrc = analyzeWavelet(src, par, par.verbose>0);
-    //analyzeModel(*allsrc->getHyper(),model,par);
-    //lop.dotProduct();
     
 // If more than one shot is modeled, don't save the wavefield
     if (par.ns>1) par.sub=0;

@@ -21,7 +21,7 @@ public:
         _domain = domain;
         _range = range;
     }
-    virtual bool checkDomainRange(const std::shared_ptr<vecReg<data_t> > mod, const std::shared_ptr<vecReg<data_t> > dat) const {return true;}
+    virtual bool checkDomainRange(const std::shared_ptr<vecReg<data_t> > mod, const std::shared_ptr<vecReg<data_t> > dat) const {return checkN123(mod, dat);}
     bool checkSame(const std::shared_ptr<vecReg<data_t> > mod, const std::shared_ptr<vecReg<data_t> > dat) const {
         if ((*mod->getHyper() != _domain) || (*dat->getHyper() != _range)) return false;
         else return true;
@@ -221,6 +221,14 @@ public:
     }
 };
 
+
+
+
+
+// ----------------------------------------------------------------------------------------//
+// non-linear operators
+// ----------------------------------------------------------------------------------------//
+
 // non-linear soft clip operator h(x) = ig(f(g(x)))
 // g(x) = (2.(x-xmean)/Dx)^p    Dx = xmax-xmin  xmean = (xmax+xmin)/2
 // f(g) = g-g^q/q if |g|<1 and = sign(g).(q-1)/q otherwise
@@ -285,6 +293,56 @@ public:
     void apply_forward(bool add, const data_t * pmod, data_t * pdat);
     void apply_jacobianT(bool add, data_t * pmod, const data_t * pmod0, const data_t * pdat);
 };
+
+
+// Elastic model parameterization using P-impedance, S-impedance, density, then anisotropy if applicable
+class pi_si_rho : public nloper {
+public:
+    pi_si_rho(){}
+    ~pi_si_rho(){}
+    pi_si_rho(const hypercube<data_t> &domain){
+        successCheck((domain.getNdim()>=2) && (domain.getAxis(domain.getNdim()).n>=3),"The domain must be at least 2D with the last dimension containing at least 3 fields\n");
+        _domain = domain;
+        _range = domain;
+    }
+    pi_si_rho * clone() const {
+        pi_si_rho * op = new pi_si_rho(_domain);
+        return op;
+    }   
+    void apply_forward(bool add, const data_t * pmod, data_t * pdat);
+    void apply_jacobianT(bool add, data_t * pmod, const data_t * pmod0, const data_t * pdat);
+    void apply_inverse(bool add, data_t * pmod, const data_t * pdat);
+};
+
+// Elastic model parameterization using log(Vs/Vs0), log(Vp/Vs - sqrt(2)), log(rho/rho0), then anisotropy if applicable
+// Vs0 and rho0 are some fixed reference values
+class vs_vpvs_rho : public nloper {
+protected:
+    data_t _vs0;
+    data_t _rho0;
+public:
+    vs_vpvs_rho(){}
+    ~vs_vpvs_rho(){}
+    vs_vpvs_rho(const hypercube<data_t> &domain, data_t vs0=1.0, data_t rho0=1.0){
+        successCheck((domain.getNdim()>=2) && (domain.getAxis(domain.getNdim()).n>=3),"The domain must be at least 2D with the last dimension containing at least 3 fields\n");
+        _domain = domain;
+        _range = domain;
+        _vs0=vs0;
+        _rho0=rho0;
+    }
+    vs_vpvs_rho * clone() const {
+        vs_vpvs_rho * op = new vs_vpvs_rho(_domain,_vs0,_rho0);
+        return op;
+    }   
+    void apply_forward(bool add, const data_t * pmod, data_t * pdat);
+    void apply_jacobianT(bool add, data_t * pmod, const data_t * pmod0, const data_t * pdat);
+    void apply_inverse(bool add, data_t * pmod, const data_t * pdat);
+};
+
+
+// ----------------------------------------------------------------------------------------//
+// linear operators
+// ----------------------------------------------------------------------------------------//
 
 // operator to resampler data in time (along the fast axis)
 class resampler : public loper {
@@ -602,6 +660,7 @@ public:
     extrapolator1d3d(){}
     ~extrapolator1d3d(){}
     extrapolator1d3d(const hypercube<data_t> &domain, std::shared_ptr<vecReg<data_t> > hrz){
+        successCheck(domain.getNdim()==2,"Domain must contain 2 axes (depth and components)\n");
         successCheck(hrz->getHyper()->getNdim()==2,"The horizon must be 2D\n");
         _domain = domain;
         std::vector<axis<data_t> > axes = domain.getAxes();

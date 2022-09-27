@@ -15,6 +15,7 @@ void analyzeGeometry(const hypercube<data_t> &model, param &par, bool verbose)
         par.soft_clip=0;
         par.nscomp=1;
         par.nrcomp=1;
+        par.model_parameterization=1;
     }
     else{
         if (par.mt) par.nscomp=6;
