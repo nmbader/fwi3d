@@ -192,10 +192,6 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
     // Sum all gradients
     mpiWrapper::allReduceSum(_pg->getVals(), _pg->getVals(), _pg->getN123());
 
-    if (_P != nullptr) _P->jacobianT(false,_g,_m,_pg);
-
-    if (_gmask != nullptr) _g->mult(_gmask);
-
     if (_par.scale_source_times>0) _scale_source_times++;
 }
 

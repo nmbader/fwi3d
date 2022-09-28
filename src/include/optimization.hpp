@@ -289,6 +289,8 @@ public:
     }
     virtual void grad() {
         // already computed in the compute_res_and_grad() method above
+        if (_P != nullptr) _P->jacobianT(false,_g,_m,_pg);
+        if (_gmask != nullptr) _g->mult(_gmask);
     }
 };
 
@@ -448,7 +450,11 @@ public:
     void grad() {
         // the first component is already computed in the compute_res_and_grad() method above
         _D->apply_jacobianT(false,_dg->getVals(),_m->getCVals(),_r->getVals()+_d->getN123());
+
+        if (_P != nullptr) _P->jacobianT(false,_g,_m,_pg);
         _g->scaleAdd(_dg,1,_lambda/_mnorm);
+
+        if (_gmask != nullptr) _g->mult(_gmask);
     }
 };
 
