@@ -34,7 +34,7 @@ void nloper::dotProduct(){
     fprintf(stderr,"Dot product with eps = %f:\n",eps);
     fprintf(stderr,"sum1 = %f\nsum2 = %f\ndiff (x1000) = %f\n",sum1,sum2,1000*(sum1 - sum2));
 
-    eps = 0.01;
+    eps /= 10;
 
     m1 = dm->clone();
     m1->scaleAdd(m,eps,1); // m + eps.dm
@@ -49,7 +49,7 @@ void nloper::dotProduct(){
     fprintf(stderr,"Dot product with eps = %f:\n",eps);
     fprintf(stderr,"sum1 = %f\nsum2 = %f\ndiff (x1000) = %f\n",sum1,sum2,1000*(sum1 - sum2));
 
-    eps = 0.0001;
+    eps /= 10;
     
     m1 = dm->clone();
     m1->scaleAdd(m,eps,1); // m + eps.dm
@@ -160,11 +160,11 @@ void emodelSoftClip::apply_forward(bool add, const data_t * pmod, data_t * pdat)
     vsClip.apply_forward(false, pm[1], pd[1]);
     rhoClip.apply_forward(add, pm[2], pd[2]);
 
-    // vs/vp ratio clip
+    // vs/vp ratio clip (conditional)
     #pragma omp parallel for
     for (int i=0; i<n; i++) pd[1][i] = pd[1][i] / pd[0][i];
 
-    spratioClip.apply_forward(false, pd[1], pd[1]);
+    if (_spratio < 1.0/sqrt(2)) spratioClip.apply_forward(false, pd[1], pd[1]);
     
     #pragma omp parallel for
     for (int i=0; i<n; i++) {
@@ -209,46 +209,54 @@ void emodelSoftClip::apply_jacobianT(bool add, data_t * pmod, const data_t * pmo
         pmod[i] = add*pmod[i] + pdat[i];
     }
 
-    // forward vp,vs clip -> vp,spratio -> spratio clip
-    data_t * v0 = new data_t [2*n];
-    data_t * v1 = new data_t [n];
-    data_t * m0 = new data_t [2*n];
-    memset(v0, 0, sizeof(data_t)*2*n);
-    memset(m0, 0, sizeof(data_t)*2*n);
-    vpClip.apply_forward(false, pmod0, v0);
-    vsClip.apply_forward(false, pmod0+n, v0+n);
+    if (_spratio < 1.0/sqrt(2))
+    {
+        // forward vp,vs clip -> vp,spratio -> spratio clip
+        data_t * v0 = new data_t [2*n];
+        data_t * v1 = new data_t [n];
+        data_t * m0 = new data_t [2*n];
+        memset(v0, 0, sizeof(data_t)*2*n);
+        memset(m0, 0, sizeof(data_t)*2*n);
+        vpClip.apply_forward(false, pmod0, v0);
+        vsClip.apply_forward(false, pmod0+n, v0+n);
 
-    #pragma omp parallel for
-    for (int i=0; i<n; i++) v0[n+i] = v0[n+i] / v0[i];
+        #pragma omp parallel for
+        for (int i=0; i<n; i++) v0[n+i] = v0[n+i] / v0[i];
 
-    memcpy(v1, v0+n, sizeof(data_t)*n);
+        memcpy(v1, v0+n, sizeof(data_t)*n);
 
-    spratioClip.apply_forward(false, v1, v1);
+        spratioClip.apply_forward(false, v1, v1);
 
-    // jacobian of vp,spratio -> vp,vs
-    #pragma omp parallel for
-    for (int i=0; i<n; i++) {
-        m0[i] = pd[0][i] + v1[i]*pd[1][i];
-        m0[n+i] = v0[i]*pd[1][i];
+        // jacobian of vp,spratio -> vp,vs
+        #pragma omp parallel for
+        for (int i=0; i<n; i++) {
+            m0[i] = pd[0][i] + v1[i]*pd[1][i];
+            m0[n+i] = v0[i]*pd[1][i];
+        }
+
+        // jacobian of spratio clip
+        spratioClip.apply_jacobianT(false,m0+n, v0+n, m0+n);
+
+        // jacobian of vp,vs -> vp,spratio
+        #pragma omp parallel for
+        for (int i=0; i<n; i++) {
+            m0[i] = m0[i] - v0[n+i]/v0[i]*m0[n+i];
+            m0[n+i] /= v0[i];
+        }
+
+        // jacobian of vp,vs clip
+        vpClip.apply_jacobianT(add, pm[0], pm0[0], m0);
+        vsClip.apply_jacobianT(add, pm[1], pm0[1], m0+n);
+
+        delete [] v0;
+        delete [] v1;
+        delete [] m0;
     }
-
-    // jacobian of spratio clip
-    spratioClip.apply_jacobianT(false,m0+n, v0+n, m0+n);
-
-    // jacobian of vp,vs -> vp,spratio
-    #pragma omp parallel for
-    for (int i=0; i<n; i++) {
-        m0[i] = m0[i] - v0[n+i]/v0[i]*m0[n+i];
-        m0[n+i] /= v0[i];
+    else{
+        // jacobian of vp,vs
+        vpClip.apply_jacobianT(add, pm[0], pm0[0], pd[0]);
+        vsClip.apply_jacobianT(add, pm[1], pm0[1], pd[1]);
     }
-
-    // jacobian of vp,vs clip
-    vpClip.apply_jacobianT(add, pm[0], pm0[0], m0);
-    vsClip.apply_jacobianT(add, pm[1], pm0[1], m0+n);
-
-    delete [] v0;
-    delete [] v1;
-    delete [] m0;
 }
 
 void lam_mu_rho::apply_forward(bool add, const data_t * pmod, data_t * pdat){

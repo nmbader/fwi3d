@@ -187,6 +187,10 @@ public:
         _L->apply_jacobianT(false, _v->getVals(), _m0->getCVals(), pdat);
         _R->apply_jacobianT(add, pmod, pmod0, _v->getCVals());
     }
+    void apply_inverse(bool add, data_t * pmod, const data_t * pdat) {
+        _L->apply_inverse(false, _v->getVals(), pdat);
+        _R->apply_inverse(add, pmod, _v->getCVals());
+    }
 };
 
 // Chain of two linear operators L.R.m
@@ -218,6 +222,10 @@ public:
     void apply_adjoint(bool add, data_t * pmod, const data_t * pdat) {
         _L->apply_adjoint(false, _v->getVals(), pdat);
         _R->apply_adjoint(add, pmod, _v->getCVals());
+    }
+    void apply_inverse(bool add, data_t * pmod, const data_t * pdat) {
+        _L->apply_inverse(false, _v->getVals(), pdat);
+        _R->apply_inverse(add, pmod, _v->getCVals());
     }
 };
 
@@ -264,7 +272,7 @@ public:
     void apply_jacobianT(bool add, data_t * pmod, const data_t * pmod0, const data_t * pdat);
 };
 
-// soft clip of the elastic model and the Vs/Vp ratio
+// soft clip of the elastic model and possibly the Vs/Vp ratio
 class emodelSoftClip : public nloper {
     data_t _vpmin;
     data_t _vpmax;
