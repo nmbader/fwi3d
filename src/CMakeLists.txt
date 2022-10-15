@@ -21,7 +21,7 @@ set(SRC_FWI3D ${SRC_DIR}/injector.cpp
                 ${SRC_DIR}/optimization.cpp
 	)
 
-if(GPU)
+if(ENABLE_CUDA)
         set(SRC_FWI3D ${SRC_FWI3D} ${CUDA_DIR}/cudaKernels.cu
         ${CUDA_DIR}/cudaWeOp.cpp
         )
@@ -46,7 +46,7 @@ set(HEADERS ${INC_DIR}/injector.hpp
 set(PYTHON ${PYTHON_DIR}/seppy.py
                 ${PYTHON_DIR}/sep2numpy.py)
 
-if (GPU)
+if (ENABLE_CUDA)
         set(HEADERS ${HEADERS} ${CUDA_INC_DIR}/cudaCppWrappers.h
                 ${CUDA_INC_DIR}/cudaMisc.h
         )
@@ -83,7 +83,7 @@ install(TARGETS WE_MODELING_3D.x
 
 
 # For development purposes
-if (DEV)
+if (ENABLE_DEV)
         add_executable(TEST_FD.x ${DEV_DIR}/test_fd.cpp)
         target_link_libraries(TEST_FD.x fwi3d sep)
 

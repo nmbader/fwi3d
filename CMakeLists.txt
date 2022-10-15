@@ -26,27 +26,27 @@ if (MPI_FOUND)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_MPI")
 endif(MPI_FOUND)
 
-if(GPU)
+if(ENABLE_CUDA)
     enable_language(CUDA)
     message("CUDA enabled")
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -std=c++11 -O3 -w -Xcompiler -fopenmp")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCUDA -fPIC")
     include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-endif()
+endif(ENABLE_CUDA)
 
-if(DOUBLE_PRECISION)
+if(ENABLE_DOUBLE_PRECISION)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDOUBLE_PRECISION")
     message("Double precision activated")
 else()
     message("Single precision activated")
 endif()
 
-if(PROFILING)
+if(ENABLE_PROFILING)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg") # add the flap -pg for profiling using gprof
     message("Code profiling activated")
 endif()
 
-if(DEBUG)
+if(ENABLE_DEBUGGING)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -DDEBUG") # add the flap -g for debugging using gdb
     message("Debug mode activated")
 endif()

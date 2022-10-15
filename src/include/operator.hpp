@@ -647,7 +647,7 @@ public:
         _zw=zw;
     }
     gradient3d * clone() const {
-        gradient3d * op = new gradient3d(_domain);
+        gradient3d * op = new gradient3d(_domain,_xw,_yw,_zw);
         return op;
     }    
     void apply_forward(bool add, const data_t * pmod, data_t * pdat);
@@ -671,7 +671,7 @@ public:
         _zw=zw;
     }
     laplacian3d * clone() const {
-        laplacian3d * op = new laplacian3d(_domain);
+        laplacian3d * op = new laplacian3d(_domain,_xw,_yw,_zw);
         return op;
     }    
     void apply_forward(bool add, const data_t * pmod, data_t * pdat);

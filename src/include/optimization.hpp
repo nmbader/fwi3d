@@ -428,6 +428,9 @@ public:
     data_t getFunc(){
         if (_flag)
         {
+            int size=1, rank=0;
+            mpiWrapper::setSizeRank(&size,&rank);
+
             int n123 = _d->getN123();
             int nt = _d->getHyper()->getAxis(1).n;
             int nx = n123 / nt;
@@ -441,7 +444,7 @@ public:
             _f = fd+fm;
             _flag = false;
             
-            if (_par.verbose>0) fprintf(stderr,"Data functional = %f; Model functional = %f\n",fd,fm);
+            if (_par.verbose>0 && rank==0) fprintf(stderr,"Data functional = %f; Model functional = %f\n",fd,fm);
             _dfunc.push_back(fd);
             _mfunc.push_back(fm);
         }

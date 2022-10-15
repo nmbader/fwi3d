@@ -28,7 +28,7 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
     for (int s=2; s<_par.ns; s++) ntr_cumul[s] = ntr_cumul[s-1] + _par.rxyz[s-1].size()*_par.nrcomp;
 
     time_t t = time(NULL);
-    if (_par.verbose>0 && rank==0) fprintf(stderr,"\n====================\n%s\n====================\n",ctime(&t));
+    if (_par.verbose>1 && rank==0) fprintf(stderr,"\n====================\n%s\n====================\n",ctime(&t));
 
     // loop over shots
     for (int s=rank; s<_par.ns; s+=size)
