@@ -450,7 +450,7 @@ void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, 
     // The H quadrature will be applied elsewhere to the final gradients (all shots included)
 
     int nxyz = nx*ny*nz;
-    int itlocal = par.nt/par.sub-it;
+    int itlocal = par.nt/par.sub-1-it;
     data_t (* __restrict pm) [nxyz] = (data_t (*)[nxyz]) model;
     data_t (* __restrict pfor) [3][nxyz] = (data_t (*) [3][nxyz]) u_full;
     data_t (* __restrict padj) [nxyz] = (data_t (*)[nxyz]) curr;
@@ -1036,7 +1036,7 @@ void nl_we_op_vti::compute_gradients(const data_t * model, const data_t * u_full
     // The H quadrature will be applied elsewhere to the final gradients (all shots included)
 
     int nxyz = nx*ny*nz;
-    int itlocal = par.nt/par.sub-it;
+    int itlocal = par.nt/par.sub-1-it;
     data_t (* __restrict pm) [nxyz] = (data_t (*)[nxyz]) model;
     data_t (* __restrict pfor) [3][nxyz] = (data_t (*) [3][nxyz]) u_full;
     data_t (* __restrict padj) [nxyz] = (data_t (*)[nxyz]) curr;
@@ -1437,7 +1437,7 @@ void nl_we_op_a::compute_gradients(const data_t * model, const data_t * u_full, 
     // The H quadrature will be applied elsewhere to the final gradients (all shots included)
 
     int nxyz = nx*ny*nz;
-    int itlocal = par.nt/par.sub+1-it-1;
+    int itlocal = par.nt/par.sub-1-it;
     data_t (*pm) [nxyz] = (data_t (*)[nxyz]) model;
     data_t (*pfor) [nxyz] = (data_t (*) [nxyz]) u_full;
     const data_t *padj = curr;
@@ -1452,7 +1452,7 @@ void nl_we_op_a::compute_gradients(const data_t * model, const data_t * u_full, 
     Dz(false, curr, temp[5], nx, ny, nz, dz, 0, nx, 0, ny, 0, nz); // adjoint_z
 
     // different from time zero
-    if (par.nt/par.sub-it>0){
+    if (itlocal>0){
         #pragma omp parallel for
         for (int i=0; i<nxyz; i++) 
         {
@@ -1465,7 +1465,7 @@ void nl_we_op_a::compute_gradients(const data_t * model, const data_t * u_full, 
         #pragma omp parallel for
         for (int i=0; i<nxyz; i++) 
         {
-            g[0][i] -= 1.0/(dt*pm[0][i]*pm[0][i])*padj[i]*(pfor[itlocal+1][i]-2*pfor[itlocal][i]+pfor[itlocal-1][i]); // K gradient
+            g[0][i] -= 1.0/(dt*pm[0][i]*pm[0][i])*padj[i]*(pfor[itlocal+1][i]-pfor[itlocal][i]); // K gradient
             g[1][i] += 0.5*dt*(temp[3][i]*temp[0][i] + temp[4][i]*temp[1][i] + temp[5][i]*temp[2][i]); // rho-1 gradient
         }
     }
