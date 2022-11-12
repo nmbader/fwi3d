@@ -1608,7 +1608,7 @@ void esat_neumann_back(bool add, const data_t** in, __restrict data_t* out, int 
     int ixminb=std::max(nc1,ixmin);
     int ixmaxb=std::min(nx - nc1, ixmax);
     int izminb=std::max(nc1,izmin);
-    int izmaxb=std::min(ny - nc1, izmax);
+    int izmaxb=std::min(nz - nc1, izmax);
     data_t adh = 1.0/(dy*h0);
 
     data_t sumx, sumy, sumz, sumy0;
@@ -2209,7 +2209,7 @@ void esat_scale_boundaries(data_t** in, int nx, int ny, int nz, data_t dx, data_
                 for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
                     scalerz = sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0) + sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0);
                     scalerx = sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0) + sqrt(f(par,IXYZ(ix,iy,iz))*(par[0][IXYZ(ix,iy,iz)]+2*par[1][IXYZ(ix,iy,iz)])/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
-                    scalery = sqrt((par[0][IXYZ(ix,iy,iz)]+2*par[1][IXYZ(ix,iy,iz)])/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0) + sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    scalery = sqrt(f(par,IXYZ(ix,iy,iz))*(par[0][IXYZ(ix,iy,iz)]+2*par[1][IXYZ(ix,iy,iz)])/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0) + sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
                     in[0][IXYZ(ix,iy,iz)] /= (1+scalerx);
                     in[1][IXYZ(ix,iy,iz)] /= (1+scalery);
                     in[2][IXYZ(ix,iy,iz)] /= (1+scalerz);
@@ -2234,7 +2234,7 @@ void esat_scale_boundaries(data_t** in, int nx, int ny, int nz, data_t dx, data_
                 for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
                     scalerz = sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0) + sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0);
                     scalerx = sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0) + sqrt(f(par,IXYZ(ix,iy,iz))*(par[0][IXYZ(ix,iy,iz)]+2*par[1][IXYZ(ix,iy,iz)])/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
-                    scalery = sqrt((par[0][IXYZ(ix,iy,iz)]+2*par[1][IXYZ(ix,iy,iz)])/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0) + sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    scalery = sqrt(f(par,IXYZ(ix,iy,iz))*(par[0][IXYZ(ix,iy,iz)]+2*par[1][IXYZ(ix,iy,iz)])/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0) + sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
                     in[0][IXYZ(ix,iy,iz)] /= (1+scalerx);
                     in[1][IXYZ(ix,iy,iz)] /= (1+scalery);
                     in[2][IXYZ(ix,iy,iz)] /= (1+scalerz);
@@ -2317,7 +2317,7 @@ void esat_scale_boundaries(data_t** in, int nx, int ny, int nz, data_t dx, data_
                 for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
                     scalerz = sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0) + sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0);
                     scalerx = sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0) + sqrt(f(par,IXYZ(ix,iy,iz))*(par[0][IXYZ(ix,iy,iz)]+2*par[1][IXYZ(ix,iy,iz)])/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
-                    scalery = sqrt((par[0][IXYZ(ix,iy,iz)]+2*par[1][IXYZ(ix,iy,iz)])/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0) + sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    scalery = sqrt(f(par,IXYZ(ix,iy,iz))*(par[0][IXYZ(ix,iy,iz)]+2*par[1][IXYZ(ix,iy,iz)])/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0) + sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
                     in[0][IXYZ(ix,iy,iz)] /= (1+scalerx);
                     in[1][IXYZ(ix,iy,iz)] /= (1+scalery);
                     in[2][IXYZ(ix,iy,iz)] /= (1+scalerz);
@@ -2342,7 +2342,7 @@ void esat_scale_boundaries(data_t** in, int nx, int ny, int nz, data_t dx, data_
                 for (int iz = std::max(1,izmin); iz < std::min(nz-1,izmax); iz++){
                     scalerz = sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0) + sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0);
                     scalerx = sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0) + sqrt(f(par,IXYZ(ix,iy,iz))*(par[0][IXYZ(ix,iy,iz)]+2*par[1][IXYZ(ix,iy,iz)])/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
-                    scalery = sqrt((par[0][IXYZ(ix,iy,iz)]+2*par[1][IXYZ(ix,iy,iz)])/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0) + sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
+                    scalery = sqrt(f(par,IXYZ(ix,iy,iz))*(par[0][IXYZ(ix,iy,iz)]+2*par[1][IXYZ(ix,iy,iz)])/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dy * h0) + sqrt(par[1][IXYZ(ix,iy,iz)]/par[2][IXYZ(ix,iy,iz)])*dt / (2 * dx * h0);
                     in[0][IXYZ(ix,iy,iz)] /= (1+scalerx);
                     in[1][IXYZ(ix,iy,iz)] /= (1+scalery);
                     in[2][IXYZ(ix,iy,iz)] /= (1+scalerz);

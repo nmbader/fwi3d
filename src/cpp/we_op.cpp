@@ -292,6 +292,7 @@ void analyzeModel(const hypercube<data_t> &domain, std::shared_ptr<vecReg<data_t
                 model->clip(par.deltamin,par.deltamax,3*ny*nx*nz,4*ny*nx*nz);
                 model->clip(par.epsilonmin,par.epsilonmax,4*ny*nx*nz,5*ny*nx*nz);
                 model->clip(par.gammamin,par.gammamax,5*ny*nx*nz,6*ny*nx*nz);
+                epsmax = model->max(4*ny*nx*nz,5*ny*nx*nz);
             }
 
             bool check=true;
@@ -324,6 +325,7 @@ void analyzeModel(const hypercube<data_t> &domain, std::shared_ptr<vecReg<data_t
         }
         par.vmax=vpmax;
         par.vmin=vsmin;
+        if (par.nmodels==6) par.vmax *= sqrt(1+2*epsmax);
     }
 
     else
@@ -450,7 +452,7 @@ void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, 
     // The H quadrature will be applied elsewhere to the final gradients (all shots included)
 
     int nxyz = nx*ny*nz;
-    int itlocal = par.nt/par.sub-1-it;
+    int itlocal = it;
     data_t (* __restrict pm) [nxyz] = (data_t (*)[nxyz]) model;
     data_t (* __restrict pfor) [3][nxyz] = (data_t (*) [3][nxyz]) u_full;
     data_t (* __restrict padj) [nxyz] = (data_t (*)[nxyz]) curr;
@@ -470,8 +472,8 @@ void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, 
     Dy(false, pfor[itlocal][2], temp[7], nx, ny, nz, dy, 0, nx, 0, ny, 0, nz); // forwardz_y
     Dz(false, pfor[itlocal][1], temp[8], nx, ny, nz, dz, 0, nx, 0, ny, 0, nz); // forwardy_z
 
-    // different from time zero
-    if (itlocal>0){
+    // different from first and last time sample
+    if (it>0 && it<par.nt/par.sub){
         #pragma omp parallel for
         for (int i=0; i<nxyz; i++) 
         {
@@ -486,7 +488,7 @@ void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, 
         }
     }
     // time zero
-    else{
+    else if(it==0){
         #pragma omp parallel for
         for (int i=0; i<nxyz; i++) 
         {
@@ -498,6 +500,21 @@ void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, 
             g[2][i] += 1.0/dt*( padj[0][i]*(pfor[itlocal+1][0][i]-pfor[itlocal][0][i]) 
                                 + padj[1][i]*(pfor[itlocal+1][1][i]-pfor[itlocal][1][i])
                                 + padj[2][i]*(pfor[itlocal+1][2][i]-pfor[itlocal][2][i]) ); // rho gradient
+        }
+    }
+    // tmax
+    else{
+        #pragma omp parallel for
+        for (int i=0; i<nxyz; i++) 
+        {
+            g[0][i] += dt*(padj_x[0][i] + padj_y[1][i] + padj_z[2][i])*(temp[0][i] + temp[1][i] + temp[2][i]); // lambda gradient
+            g[1][i] += dt*((padj_z[0][i] + padj_x[2][i])*(temp[3][i] + temp[4][i])
+                            + (padj_y[0][i] + padj_x[1][i])*(temp[5][i] + temp[6][i])
+                            + (padj_z[1][i] + padj_y[2][i])*(temp[7][i] + temp[8][i])
+                            + 2*padj_x[0][i]*temp[0][i] + 2*padj_y[1][i]*temp[1][i] + 2*padj_z[2][i]*temp[2][i]); // mu gradient
+            g[2][i] += 1.0/dt*(padj[0][i]*(-2*pfor[itlocal][0][i]+pfor[itlocal-1][0][i]) 
+                            + padj[1][i]*( -2*pfor[itlocal][1][i]+pfor[itlocal-1][1][i])
+                            + padj[2][i]*( -2*pfor[itlocal][2][i]+pfor[itlocal-1][2][i]) ); // rho gradient
         }
     }
 }
@@ -569,7 +586,7 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
         }
 
         // compute FWI gradients except for first and last time samples
-        if ((grad != nullptr) && (par.sub>0) && (it%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, it/par.sub, dx, dy, dz, par.sub*par.dt);
+        if ((grad != nullptr) && (par.sub>0) && ((par.nt-1-it)%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, (par.nt-1-it)/par.sub, dx, dy, dz, par.sub*par.dt);
 
         // apply spatial SBP operators
         Dxx_var<mu>(false, curr[0], next[0], nx, ny, nz, dx, 0, nx, 0, ny, 0, nz, mod, 2.0);
@@ -778,7 +795,7 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
     }
 
     // last sample gradient
-    if ((grad != nullptr) && (par.sub>0) && ((par.nt-1)%par.sub==0) ) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, (par.nt-1)/par.sub, dx, dy, dz, par.sub*par.dt);
+    if ((grad != nullptr) && (par.sub>0) ) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, 0, dx, dy, dz, par.sub*par.dt);
     
     delete [] u;
     delete [] dux;
@@ -1036,7 +1053,7 @@ void nl_we_op_vti::compute_gradients(const data_t * model, const data_t * u_full
     // The H quadrature will be applied elsewhere to the final gradients (all shots included)
 
     int nxyz = nx*ny*nz;
-    int itlocal = par.nt/par.sub-1-it;
+    int itlocal = it;
     data_t (* __restrict pm) [nxyz] = (data_t (*)[nxyz]) model;
     data_t (* __restrict pfor) [3][nxyz] = (data_t (*) [3][nxyz]) u_full;
     data_t (* __restrict padj) [nxyz] = (data_t (*)[nxyz]) curr;
@@ -1058,8 +1075,8 @@ void nl_we_op_vti::compute_gradients(const data_t * model, const data_t * u_full
 
     data_t val1=0, val2=0, val3=0, val4=0, del=0, gamma=0;
 
-    // different from time zero
-    if (itlocal>0){
+    // different from first and last time sample
+    if (it>0 && it<par.nt/par.sub){
         #pragma omp parallel for private(val1,val2,val3,val4,del,gamma)
         for (int i=0; i<nxyz; i++) 
         {
@@ -1080,12 +1097,12 @@ void nl_we_op_vti::compute_gradients(const data_t * model, const data_t * u_full
                             + (1+2*gamma)*(padj_x[1][i] + padj_y[0][i])*(temp[5][i] + temp[6][i])
                             + val3*val4 ); // mu gradient
             g[2][i] += 1.0/dt*(padj[0][i]*(pfor[itlocal+1][0][i]-2*pfor[itlocal][0][i]+pfor[itlocal-1][0][i]) 
-                            + padj[1][i]*(pfor[itlocal+1][1][i]-2*pfor[itlocal][1][i]+pfor[itlocal-1][1][i])
-                            + padj[2][i]*(pfor[itlocal+1][2][i]-2*pfor[itlocal][2][i]+pfor[itlocal-1][2][i]) ); // rho gradient
+                            + padj[1][i]*( pfor[itlocal+1][1][i]-2*pfor[itlocal][1][i]+pfor[itlocal-1][1][i])
+                            + padj[2][i]*( pfor[itlocal+1][2][i]-2*pfor[itlocal][2][i]+pfor[itlocal-1][2][i]) ); // rho gradient
         }
     }
     // time zero
-    else{
+    else if(it==0){
         #pragma omp parallel for private(val1,val2,val3,val4,del,gamma)
         for (int i=0; i<nxyz; i++) 
         {
@@ -1108,6 +1125,32 @@ void nl_we_op_vti::compute_gradients(const data_t * model, const data_t * u_full
             g[2][i] += 1.0/dt*( padj[0][i]*(pfor[itlocal+1][0][i]-pfor[itlocal][0][i]) 
                                 + padj[1][i]*(pfor[itlocal+1][1][i]-pfor[itlocal][1][i])
                                 + padj[2][i]*(pfor[itlocal+1][2][i]-pfor[itlocal][2][i]) ); // rho gradient
+        }
+    }
+    // tmax
+    else{
+        #pragma omp parallel for private(val1,val2,val3,val4,del,gamma)
+        for (int i=0; i<nxyz; i++) 
+        {
+            del = ((pm[3][i]+pm[1][i])*(pm[3][i]+pm[1][i]) - (pm[0][i]+pm[1][i])*(pm[0][i]+pm[1][i])) / (2*(pm[0][i]+pm[1][i])*(pm[0][i]+2*pm[1][i]));((pm[3][i]+pm[1][i])*(pm[3][i]+pm[1][i]) - (pm[0][i]+pm[1][i])*(pm[0][i]+pm[1][i])) / (2*(pm[0][i]+pm[1][i])*(pm[0][i]+2*pm[1][i]));
+            gamma = (pm[5][i] - pm[1][i]) / (2*pm[1][i]);
+            val1 = sqrt(2*(pm[0][i]+2*pm[1][i])*(pm[0][i]+pm[1][i])*del + (pm[0][i]+pm[1][i])*(pm[0][i]+pm[1][i]));
+            val2 = ((1+2*del)*pm[0][i] + (1+3*del)*pm[1][i])/val1; // d(C13)/d(lambda)
+            val3 = ((1+3*del)*pm[0][i] + (1+4*del)*pm[1][i])/val1 - 1; // d(C13)/d(mu)
+            val4 = (padj_x[0][i] + padj_y[1][i])*temp[2][i] + padj_z[2][i]*(temp[0][i] + temp[1][i]);
+
+            g[0][i] += dt*( (1+2*pm[4][i])*(padj_x[0][i] + padj_y[1][i])*(temp[0][i] + temp[1][i])
+                            + padj_z[2][i]*temp[2][i] + val2*val4 ); // lambda gradient
+            g[1][i] += dt*( 2*(1+2*pm[4][i])*(padj_x[0][i]*temp[0][i] + padj_y[1][i]*temp[1][i])
+                            + 2*padj_z[2][i]*temp[2][i]
+                            + 4*(pm[4][i] - gamma)*(padj_x[0][i]*temp[1][i] + padj_x[0][i]*temp[0][i])
+                            + (padj_y[2][i] + padj_z[1][i])*(temp[7][i] + temp[8][i])
+                            + (padj_x[2][i] + padj_z[0][i])*(temp[3][i] + temp[4][i])
+                            + (1+2*gamma)*(padj_x[1][i] + padj_y[0][i])*(temp[5][i] + temp[6][i])
+                            + val3*val4 ); // mu gradient
+            g[2][i] += 1.0/dt*(padj[0][i]*(-2*pfor[itlocal][0][i]+pfor[itlocal-1][0][i]) 
+                            + padj[1][i]*( -2*pfor[itlocal][1][i]+pfor[itlocal-1][1][i])
+                            + padj[2][i]*( -2*pfor[itlocal][2][i]+pfor[itlocal-1][2][i]) ); // rho gradient
         }
     }
 }
@@ -1145,7 +1188,7 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
         memset(tmp, 0, nxyz*sizeof(data_t));
     }
 	const data_t* mod[6] = {model, model+nxyz, model+2*nxyz, model+3*nxyz, model+4*nxyz, model+5*nxyz};
-    
+
     
     // source and receiver components for injection/extraction
     int nscomp = par.nscomp;
@@ -1179,7 +1222,7 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
         }
 
         // compute FWI gradients except for first and last time samples
-        if ((grad != nullptr) && (par.sub>0) && (it%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, it/par.sub, dx, dy, dz, par.sub*par.dt);
+        if ((grad != nullptr) && (par.sub>0) && ((par.nt-1-it)%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, (par.nt-1-it)/par.sub, dx, dy, dz, par.sub*par.dt);
 
         // apply spatial SBP operators
         Dxx_var<c11b>(false, curr[0], next[0], nx, ny, nz, dx, 0, nx, 0, ny, 0, nz, mod, 1.0);
@@ -1398,7 +1441,7 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
     }
 
     // last sample gradient
-    if ((grad != nullptr) && (par.sub>0) && ((par.nt-1)%par.sub==0) ) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, (par.nt-1)/par.sub, dx, dy, dz, par.sub*par.dt);
+    if ((grad != nullptr) && (par.sub>0) ) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, 0, dx, dy, dz, par.sub*par.dt);
     
     delete [] u;
     delete [] dux;
@@ -1437,7 +1480,7 @@ void nl_we_op_a::compute_gradients(const data_t * model, const data_t * u_full, 
     // The H quadrature will be applied elsewhere to the final gradients (all shots included)
 
     int nxyz = nx*ny*nz;
-    int itlocal = par.nt/par.sub-1-it;
+    int itlocal = it;
     data_t (*pm) [nxyz] = (data_t (*)[nxyz]) model;
     data_t (*pfor) [nxyz] = (data_t (*) [nxyz]) u_full;
     const data_t *padj = curr;
@@ -1451,8 +1494,8 @@ void nl_we_op_a::compute_gradients(const data_t * model, const data_t * u_full, 
     Dy(false, curr, temp[4], nx, ny, nz, dy, 0, nx, 0, ny, 0, nz); // adjoint_y
     Dz(false, curr, temp[5], nx, ny, nz, dz, 0, nx, 0, ny, 0, nz); // adjoint_z
 
-    // different from time zero
-    if (itlocal>0){
+    // different from first and last time sample
+    if (it>0 && it<par.nt/par.sub){
         #pragma omp parallel for
         for (int i=0; i<nxyz; i++) 
         {
@@ -1461,12 +1504,21 @@ void nl_we_op_a::compute_gradients(const data_t * model, const data_t * u_full, 
         }
     }
     // time zero
-    else{
+    else if(it==0){
         #pragma omp parallel for
         for (int i=0; i<nxyz; i++) 
         {
             g[0][i] -= 1.0/(dt*pm[0][i]*pm[0][i])*padj[i]*(pfor[itlocal+1][i]-pfor[itlocal][i]); // K gradient
             g[1][i] += 0.5*dt*(temp[3][i]*temp[0][i] + temp[4][i]*temp[1][i] + temp[5][i]*temp[2][i]); // rho-1 gradient
+        }
+    }
+    // tmax
+    else{
+        #pragma omp parallel for
+        for (int i=0; i<nxyz; i++) 
+        {
+            g[0][i] -= 1.0/(dt*pm[0][i]*pm[0][i])*padj[i]*(-2*pfor[itlocal][i]+pfor[itlocal-1][i]); // K gradient
+            g[1][i] += dt*(temp[3][i]*temp[0][i] + temp[4][i]*temp[1][i] + temp[5][i]*temp[2][i]); // rho-1 gradient
         }
     }
 }
@@ -1513,7 +1565,7 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
         }
 
         // compute FWI gradients except for first and last time samples
-        if ((grad != nullptr) && (par.sub>0) && (it%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], tmp, grad, par, nx, ny, nz, it/par.sub, dx, dy, dz, par.sub*par.dt);
+        if ((grad != nullptr) && (par.sub>0) && ((par.nt-1-it)%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], tmp, grad, par, nx, ny, nz, (par.nt-1-it)/par.sub, dx, dy, dz, par.sub*par.dt);
 
         // apply spatial SBP operators
         // mu here designates the second model parameter, i.e. reciprocal of density 1/rho 
@@ -1653,4 +1705,17 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
 
         if ((it+1) % pct10 == 0 && par.verbose>2) fprintf(stderr,"Propagation progress = %d\%\n",10*(it+1)/pct10);
     }
+
+    // copy the last wfld to the full wfld vector (not needed)
+    if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) memcpy(u_full[(par.nt-1)/par.sub], curr, nxyz*sizeof(data_t));
+
+    // extract receivers last sample
+    if (grad==nullptr)
+    {
+        ext->extract(true, curr[0], rcv, nx, ny, nz, par.nt, ext->_npts, 0, par.nt-1, 0, ext->_npts, ext->_xind.data(), ext->_yind.data(), ext->_zind.data(), ext->_xw.data(), ext->_yw.data(), ext->_zw.data());
+    }
+
+    // last sample gradient
+    if ((grad != nullptr) && (par.sub>0) ) compute_gradients(model, full_wfld, curr[0], tmp, grad, par, nx, ny, nz, 0, dx, dy, dz, par.sub*par.dt);
+    
 }
