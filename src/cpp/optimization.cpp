@@ -176,8 +176,6 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
             for (int i=0; i<ntr*nt; i++) pr[i] *= pw[i];
         }
 
-        rcv->scale(1.0/_dnorm);
-
         if (_par.verbose>1) fprintf(stderr,"Computing gradient for shot %d by process %d\n",s, rank);
 
         L->apply_jacobianT(true,_pg->getVals(),_p->getVals(),rcv->getVals());
@@ -191,6 +189,9 @@ void nlls_fwi::compute_res_and_grad(data_t * r){
 
     // Sum all gradients
     mpiWrapper::allReduceSum(_pg->getVals(), _pg->getVals(), _pg->getN123());
+
+    // scale by normalization factor
+    _pg->scale(1.0/_dnorm);
 
     if (_par.scale_source_times>0) _scale_source_times++;
 }

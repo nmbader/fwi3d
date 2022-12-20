@@ -41,6 +41,7 @@ set(HEADERS ${INC_DIR}/injector.hpp
                 ${INC_DIR}/we_op.hpp
                 ${INC_DIR}/bsplines.hpp
                 ${INC_DIR}/mpiWrapper.hpp
+                ${INC_DIR}/zfpWrapper.hpp
         )
 
 set(PYTHON ${PYTHON_DIR}/seppy.py
@@ -58,6 +59,9 @@ target_link_libraries(fwi3d fftw3f fftw3)
 if (MPI_FOUND)
         target_link_libraries(fwi3d ${MPI_CXX_LIBRARIES} )
 endif()
+if (ZFP_FOUND)
+        target_link_libraries(fwi3d ${ZFP_LIBRARIES} )
+endif()
 
 #building the main executables
 add_executable(WE_MODELING_3D.x ${MAIN_DIR}/we_modeling.cpp)
@@ -68,6 +72,7 @@ target_link_libraries(FWI3D.x fwi3d sep)
 
 add_executable(BSPLINES3D.x ${MAIN_DIR}/bsplines3d.cpp)
 target_link_libraries(BSPLINES3D.x fwi3d sep)
+
 
 #installing libraries and executables
 install(FILES ${HEADERS} DESTINATION include)
@@ -87,7 +92,10 @@ if (ENABLE_DEV)
         add_executable(TEST_FD.x ${DEV_DIR}/test_fd.cpp)
         target_link_libraries(TEST_FD.x fwi3d sep)
 
-        install(TARGETS TEST_FD.x
+        add_executable(TEST_ZFP.x ${DEV_DIR}/test_zfp.cpp)
+        target_link_libraries(TEST_ZFP.x fwi3d)
+
+        install(TARGETS TEST_FD.x TEST_ZFP.x
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
         DESTINATION bin)
 endif()

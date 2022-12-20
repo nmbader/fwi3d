@@ -23,6 +23,7 @@ int main(int argc, char **argv){
 // Read parameters for wave propagation
     param par;
     readParameters(argc, argv, par);
+    par.compression_rate=0;
     int verbose=par.verbose;
     if (rank>0) par.verbose=0;
 

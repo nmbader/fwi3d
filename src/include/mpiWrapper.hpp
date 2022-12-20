@@ -1,6 +1,5 @@
 #pragma once
 
-#include <iostream>
 #include "vecReg.hpp"
 #ifdef ENABLE_MPI
     #include "mpi.h"

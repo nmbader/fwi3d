@@ -61,6 +61,7 @@ struct param{
     // miscallenous
     int nthreads=0; // maximum number of threads to use in openMP
     int verbose=1; // logging level {0,1,2,3}
+    int compression_rate=0; // wavefield compression rate when ZFP is enabled
     bool format=0; // data format for read/write : SEP (0) or binary (1)
     std::string datapath="none"; // datapath for binary outputs
 };

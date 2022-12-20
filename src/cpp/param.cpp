@@ -174,6 +174,7 @@ void readParam(int argc, char **argv, param &par){
     readParam<int>(argc, argv, "scale_source_times", par.scale_source_times);
     readParam<int>(argc, argv, "verbose", par.verbose);
     readParam<int>(argc, argv, "nthreads", par.nthreads);
+    readParam<int>(argc, argv, "compression_rate", par.compression_rate);
     readParam<bool>(argc, argv, "mt", par.mt);
     readParam<bool>(argc, argv, "bsplines", par.bsplines);
     readParam<bool>(argc, argv, "soft_clip", par.soft_clip);

@@ -441,7 +441,7 @@ static inline data_t pimp2(const data_t ** par, int i){return 0.5*sqrt((1+2*par[
 static inline data_t aimp(const data_t ** par, int i){return 0.5/sqrt(par[0][i]/par[1][i]);} // e.g. = 1/(2.sqrt(rho.K))
 static inline data_t eps2(const data_t ** par, int i){return 1+2*par[4][i];} // e.g. = 1+2.eps
 
-void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, const data_t * curr, const data_t * u_x,  const data_t * u_y, const data_t * u_z, data_t * tmp, data_t * grad, const param &par, int nx, int ny, int nz, int it, data_t dx, data_t dy, data_t dz, data_t dt) const
+void nl_we_op_e::compute_gradients(const data_t * model, const data_t ** u_full, const data_t * curr, const data_t * u_x,  const data_t * u_y, const data_t * u_z, data_t * tmp, data_t * grad, const param &par, int nx, int ny, int nz, int it, data_t dx, data_t dy, data_t dz, data_t dt) const
 {
     // Grad_lambda for wide stencil = div(adjoint).H.Ht.div(forward)
     // Grad_mu for wide stencil = (adjointx_z+adjointz_x).H.Ht.(forwardx_z+forwardz_x)
@@ -452,9 +452,10 @@ void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, 
     // The H quadrature will be applied elsewhere to the final gradients (all shots included)
 
     int nxyz = nx*ny*nz;
-    int itlocal = it;
+    int itlocal = 1;
     data_t (* __restrict pm) [nxyz] = (data_t (*)[nxyz]) model;
-    data_t (* __restrict pfor) [3][nxyz] = (data_t (*) [3][nxyz]) u_full;
+    // data_t (* __restrict pfor) [3][nxyz] = (data_t (*) [3][nxyz]) u_full;
+    const data_t * pfor [3][3] = {{u_full[0], u_full[0]+nxyz, u_full[0]+2*nxyz}, {u_full[1], u_full[1]+nxyz, u_full[1]+2*nxyz}, {u_full[2], u_full[2]+nxyz, u_full[2]+2*nxyz}};
     data_t (* __restrict padj) [nxyz] = (data_t (*)[nxyz]) curr;
     data_t (* __restrict padj_x) [nxyz] = (data_t (*)[nxyz]) u_x;
     data_t (* __restrict padj_y) [nxyz] = (data_t (*)[nxyz]) u_y;
@@ -512,14 +513,14 @@ void nl_we_op_e::compute_gradients(const data_t * model, const data_t * u_full, 
                             + (padj_y[0][i] + padj_x[1][i])*(temp[5][i] + temp[6][i])
                             + (padj_z[1][i] + padj_y[2][i])*(temp[7][i] + temp[8][i])
                             + 2*padj_x[0][i]*temp[0][i] + 2*padj_y[1][i]*temp[1][i] + 2*padj_z[2][i]*temp[2][i]); // mu gradient
-            g[2][i] += 1.0/dt*(padj[0][i]*(-2*pfor[itlocal][0][i]+pfor[itlocal-1][0][i]) 
-                            + padj[1][i]*( -2*pfor[itlocal][1][i]+pfor[itlocal-1][1][i])
-                            + padj[2][i]*( -2*pfor[itlocal][2][i]+pfor[itlocal-1][2][i]) ); // rho gradient
+            g[2][i] += 1.0/dt*(padj[0][i]*(-pfor[itlocal][0][i]+pfor[itlocal-1][0][i]) 
+                            + padj[1][i]*( -pfor[itlocal][1][i]+pfor[itlocal-1][1][i])
+                            + padj[2][i]*( -pfor[itlocal][2][i]+pfor[itlocal-1][2][i]) ); // rho gradient
         }
     }
 }
 
-void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, data_t * rcv, const injector * inj, const injector * ext, data_t * full_wfld, data_t * grad, const param &par, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t ox, data_t oy, data_t oz) const
+void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, data_t * rcv, const injector * inj, const injector * ext, data_t * grad, const param &par, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t ox, data_t oy, data_t oz) const
 {
     // wavefields allocations and pointers
     int nxyz = nx*ny*nz;
@@ -540,8 +541,12 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
     data_t (* __restrict u_z) [nxyz] = (data_t (*)[nxyz]) duz;
     data_t (* __restrict u_full) [3][nxyz];
     data_t * __restrict tmp;
+    // data_t * full_wfld = nullptr;
 
-    if (par.sub>0) u_full = (data_t (*) [3][nxyz]) full_wfld;
+    // if (_par.sub>0) {
+    //     full_wfld = _full_wfld->getVals();
+    //     u_full = (data_t (*) [3][nxyz]) _full_wfld->getVals();
+    // }
     if (grad != nullptr) 
     {
         tmp = new data_t[9*nxyz];
@@ -552,6 +557,10 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
         memset(tmp, 0, nxyz*sizeof(data_t));
     }
 	const data_t* mod[3] = {model, model+nxyz, model+2*nxyz};
+    data_t * pfor_nm1 = nullptr, * pfor_n = nullptr, * pfor_np1 = nullptr;
+    _zfp_wfld.allocate(pfor_nm1);
+    _zfp_wfld.allocate(pfor_n);
+    _zfp_wfld.allocate(pfor_np1);
     
     
     // source and receiver components for injection/extraction
@@ -575,7 +584,8 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
     for (int it=0; it<par.nt-1; it++)
     {
         // copy the current wfld to the full wfld vector
-        if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) memcpy(u_full[it/par.sub], curr, 3*nxyz*sizeof(data_t));
+        // if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) memcpy(u_full[it/par.sub], curr, 3*nxyz*sizeof(data_t));
+        if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) _zfp_wfld.set(curr[0], it/par.sub);
 
         // extract receivers
         if (grad == nullptr)
@@ -586,7 +596,14 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
         }
 
         // compute FWI gradients except for first and last time samples
-        if ((grad != nullptr) && (par.sub>0) && ((par.nt-1-it)%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, (par.nt-1-it)/par.sub, dx, dy, dz, par.sub*par.dt);
+        if ((grad != nullptr) && (par.sub>0) && ((par.nt-1-it)%par.sub==0) && it!=0) {
+            int itlocal = (par.nt-1-it)/par.sub;
+            _zfp_wfld.get(pfor_nm1, itlocal-1);
+            _zfp_wfld.get(pfor_n, itlocal);
+            _zfp_wfld.get(pfor_np1, itlocal+1);
+            const data_t * pfor[3] = {pfor_nm1, pfor_n, pfor_np1};
+            compute_gradients(model, pfor, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, itlocal, dx, dy, dz, par.sub*par.dt);
+        }
 
         // apply spatial SBP operators
         Dxx_var<mu>(false, curr[0], next[0], nx, ny, nz, dx, 0, nx, 0, ny, 0, nz, mod, 2.0);
@@ -784,7 +801,8 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
     }
 
     // copy the last wfld to the full wfld vector
-    if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) memcpy(u_full[(par.nt-1)/par.sub], curr, 3*nxyz*sizeof(data_t));
+    // if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) memcpy(u_full[(par.nt-1)/par.sub], curr, 3*nxyz*sizeof(data_t));
+    if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) _zfp_wfld.set(curr[0], (par.nt-1)/par.sub);
 
     // extract receivers last sample
     if (grad == nullptr)
@@ -795,13 +813,22 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
     }
 
     // last sample gradient
-    if ((grad != nullptr) && (par.sub>0) ) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, 0, dx, dy, dz, par.sub*par.dt);
+    if ((grad != nullptr) && (par.sub>0) ) {
+        _zfp_wfld.get(pfor_n, 0);
+        _zfp_wfld.get(pfor_np1, 1);
+        const data_t * pfor[3] = {pfor_nm1, pfor_n, pfor_np1};
+        compute_gradients(model, pfor, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, 0, dx, dy, dz, par.sub*par.dt);
+    }
     
     delete [] u;
     delete [] dux;
     delete [] duy;
     delete [] duz;
     delete [] tmp;
+
+    _zfp_wfld.deallocate(pfor_nm1);
+    _zfp_wfld.deallocate(pfor_n);
+    _zfp_wfld.deallocate(pfor_np1);
 }
 
 void nl_we_op_e::apply_forward(bool add, const data_t * pmod, data_t * pdat)
@@ -817,10 +844,12 @@ void nl_we_op_e::apply_forward(bool add, const data_t * pmod, data_t * pdat)
     axis<data_t> Z = _domain.getAxis(1);
     hypercube<data_t> domain = *_src->getHyper();
 
-    if (_par.sub>0){
-        if (_par.nmodels>=3) _full_wfld=std::make_shared<vecReg<data_t> > (hypercube<data_t>(Z,X,Y,axis<data_t>(3,0,1), axis<data_t>(1+_par.nt/_par.sub,0,_par.dt*_par.sub)));
-        else _full_wfld=std::make_shared<vecReg<data_t> > (hypercube<data_t>(Z,X,Y, axis<data_t>(1+_par.nt/_par.sub,0,_par.dt*_par.sub)));
-    }
+    // if (_par.sub>0){
+    //     if (_par.nmodels>=3) _full_wfld=std::make_shared<vecReg<data_t> > (hypercube<data_t>(Z,X,Y,axis<data_t>(3,0,1), axis<data_t>(1+_par.nt/_par.sub,0,_par.dt*_par.sub)));
+    //     else _full_wfld=std::make_shared<vecReg<data_t> > (hypercube<data_t>(Z,X,Y, axis<data_t>(1+_par.nt/_par.sub,0,_par.dt*_par.sub)));
+    //     _full_wfld->zero();
+    // }
+    if (_par.sub>0) _zfp_wfld.initialize(hypercube<data_t>(Z,X,Y,axis<data_t>(1+2*(_par.nmodels>=3),0,1), axis<data_t>(1+_par.nt/_par.sub,0,_par.dt*_par.sub)), _par.compression_rate);
 
     // setting up and apply the time resampling operator
     resampler * resamp;
@@ -858,9 +887,7 @@ void nl_we_op_e::apply_forward(bool add, const data_t * pmod, data_t * pdat)
     else ext = new dipole_m3(_domain,_par.rxyz[0],_par.gl);
 
     // perform the wave propagation
-    data_t * full = nullptr;
-    if (_par.sub>0) full = _full_wfld->getVals();
-    propagate(false, pm, src->getCVals(), rcv->getVals(), inj, ext, full, nullptr, _par, X.n, Y.n, Z.n, X.d, Y.d, Z.d, X.o, Y.o, Z.o);
+    propagate(false, pm, src->getCVals(), rcv->getVals(), inj, ext, nullptr, _par, X.n, Y.n, Z.n, X.d, Y.d, Z.d, X.o, Y.o, Z.o);
 
     delete inj;
     delete ext;
@@ -964,9 +991,7 @@ void nl_we_op_e::apply_jacobianT(bool add, data_t * pmod, const data_t * pmod0, 
     else inj = new dipole_m3(_domain,_par.rxyz[0],_par.gl);
 
     // perform the wave propagation
-    data_t * full = nullptr;
-    if (_par.sub>0) full = _full_wfld->getVals();
-    propagate(true, pm0, rcv->getCVals(), src->getVals(), inj, ext, full, pmod, _par, X.n, Y.n, Z.n, X.d, Y.d, Z.d, X.o, Y.o, Z.o);
+    propagate(true, pm0, rcv->getCVals(), src->getVals(), inj, ext, pmod, _par, X.n, Y.n, Z.n, X.d, Y.d, Z.d, X.o, Y.o, Z.o);
 
     delete inj;
     delete ext;
@@ -1047,15 +1072,16 @@ void nl_we_op_vti::convert_model(data_t * m, int n, bool forward) const
     }
 }
 
-void nl_we_op_vti::compute_gradients(const data_t * model, const data_t * u_full, const data_t * curr, const data_t * u_x,  const data_t * u_y, const data_t * u_z, data_t * tmp, data_t * grad, const param &par, int nx, int ny, int nz, int it, data_t dx, data_t dy, data_t dz, data_t dt) const
+void nl_we_op_vti::compute_gradients(const data_t * model, const data_t ** u_full, const data_t * curr, const data_t * u_x,  const data_t * u_y, const data_t * u_z, data_t * tmp, data_t * grad, const param &par, int nx, int ny, int nz, int it, data_t dx, data_t dy, data_t dz, data_t dt) const
 {
     // see notes for gradients expression
     // The H quadrature will be applied elsewhere to the final gradients (all shots included)
 
     int nxyz = nx*ny*nz;
-    int itlocal = it;
+    int itlocal = 1;
     data_t (* __restrict pm) [nxyz] = (data_t (*)[nxyz]) model;
-    data_t (* __restrict pfor) [3][nxyz] = (data_t (*) [3][nxyz]) u_full;
+    // data_t (* __restrict pfor) [3][nxyz] = (data_t (*) [3][nxyz]) u_full;
+    const data_t * pfor [3][3] = {{u_full[0], u_full[0]+nxyz, u_full[0]+2*nxyz}, {u_full[1], u_full[1]+nxyz, u_full[1]+2*nxyz}, {u_full[2], u_full[2]+nxyz, u_full[2]+2*nxyz}};
     data_t (* __restrict padj) [nxyz] = (data_t (*)[nxyz]) curr;
     data_t (* __restrict padj_x) [nxyz] = (data_t (*)[nxyz]) u_x;
     data_t (* __restrict padj_y) [nxyz] = (data_t (*)[nxyz]) u_y;
@@ -1148,14 +1174,14 @@ void nl_we_op_vti::compute_gradients(const data_t * model, const data_t * u_full
                             + (padj_x[2][i] + padj_z[0][i])*(temp[3][i] + temp[4][i])
                             + (1+2*gamma)*(padj_x[1][i] + padj_y[0][i])*(temp[5][i] + temp[6][i])
                             + val3*val4 ); // mu gradient
-            g[2][i] += 1.0/dt*(padj[0][i]*(-2*pfor[itlocal][0][i]+pfor[itlocal-1][0][i]) 
-                            + padj[1][i]*( -2*pfor[itlocal][1][i]+pfor[itlocal-1][1][i])
-                            + padj[2][i]*( -2*pfor[itlocal][2][i]+pfor[itlocal-1][2][i]) ); // rho gradient
+            g[2][i] += 1.0/dt*(padj[0][i]*(-pfor[itlocal][0][i]+pfor[itlocal-1][0][i]) 
+                            + padj[1][i]*( -pfor[itlocal][1][i]+pfor[itlocal-1][1][i])
+                            + padj[2][i]*( -pfor[itlocal][2][i]+pfor[itlocal-1][2][i]) ); // rho gradient
         }
     }
 }
 
-void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src, data_t * rcv, const injector * inj, const injector * ext, data_t * full_wfld, data_t * grad, const param &par, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t ox, data_t oy, data_t oz) const
+void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src, data_t * rcv, const injector * inj, const injector * ext, data_t * grad, const param &par, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t ox, data_t oy, data_t oz) const
 {
     // wavefields allocations and pointers
     int nxyz = nx*ny*nz;
@@ -1176,8 +1202,12 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
     data_t (* __restrict u_z) [nxyz] = (data_t (*)[nxyz]) duz;
     data_t (* __restrict u_full) [3][nxyz];
     data_t * __restrict tmp;
+    // data_t * full_wfld = nullptr;
 
-    if (par.sub>0) u_full = (data_t (*) [3][nxyz]) full_wfld;
+    // if (_par.sub>0) {
+    //     full_wfld = _full_wfld->getVals();
+    //     u_full = (data_t (*) [3][nxyz]) _full_wfld->getVals();
+    // }
     if (grad != nullptr) 
     {
         tmp = new data_t[9*nxyz];
@@ -1188,7 +1218,10 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
         memset(tmp, 0, nxyz*sizeof(data_t));
     }
 	const data_t* mod[6] = {model, model+nxyz, model+2*nxyz, model+3*nxyz, model+4*nxyz, model+5*nxyz};
-
+    data_t * pfor_nm1 = nullptr, * pfor_n = nullptr, * pfor_np1 = nullptr;
+    _zfp_wfld.allocate(pfor_nm1);
+    _zfp_wfld.allocate(pfor_n);
+    _zfp_wfld.allocate(pfor_np1);
     
     // source and receiver components for injection/extraction
     int nscomp = par.nscomp;
@@ -1211,7 +1244,8 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
     for (int it=0; it<par.nt-1; it++)
     {
         // copy the current wfld to the full wfld vector
-        if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) memcpy(u_full[it/par.sub], curr, 3*nxyz*sizeof(data_t));
+        // if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) memcpy(u_full[it/par.sub], curr, 3*nxyz*sizeof(data_t));
+        if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) _zfp_wfld.set(curr[0], it/par.sub);
 
         // extract receivers
         if (grad == nullptr)
@@ -1222,7 +1256,14 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
         }
 
         // compute FWI gradients except for first and last time samples
-        if ((grad != nullptr) && (par.sub>0) && ((par.nt-1-it)%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, (par.nt-1-it)/par.sub, dx, dy, dz, par.sub*par.dt);
+        if ((grad != nullptr) && (par.sub>0) && ((par.nt-1-it)%par.sub==0) && it!=0) {
+            int itlocal = (par.nt-1-it)/par.sub;
+            _zfp_wfld.get(pfor_nm1, itlocal-1);
+            _zfp_wfld.get(pfor_n, itlocal);
+            _zfp_wfld.get(pfor_np1, itlocal+1);
+            const data_t * pfor[3] = {pfor_nm1, pfor_n, pfor_np1};
+            compute_gradients(model, pfor, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, itlocal, dx, dy, dz, par.sub*par.dt);
+        }
 
         // apply spatial SBP operators
         Dxx_var<c11b>(false, curr[0], next[0], nx, ny, nz, dx, 0, nx, 0, ny, 0, nz, mod, 1.0);
@@ -1430,7 +1471,8 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
     }
 
     // copy the last wfld to the full wfld vector
-    if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) memcpy(u_full[(par.nt-1)/par.sub], curr, 3*nxyz*sizeof(data_t));
+    // if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) memcpy(u_full[(par.nt-1)/par.sub], curr, 3*nxyz*sizeof(data_t));
+    if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) _zfp_wfld.set(curr[0], (par.nt-1)/par.sub);
 
     // extract receivers last sample
     if (grad == nullptr)
@@ -1441,13 +1483,22 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
     }
 
     // last sample gradient
-    if ((grad != nullptr) && (par.sub>0) ) compute_gradients(model, full_wfld, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, 0, dx, dy, dz, par.sub*par.dt);
+    if ((grad != nullptr) && (par.sub>0) ) {
+        _zfp_wfld.get(pfor_n, 0);
+        _zfp_wfld.get(pfor_np1, 1);
+        const data_t * pfor[3] = {pfor_nm1, pfor_n, pfor_np1};
+        compute_gradients(model, pfor, curr[0], u_x[0], u_y[0], u_z[0], tmp, grad, par, nx, ny, nz, 0, dx, dy, dz, par.sub*par.dt);
+    }
     
     delete [] u;
     delete [] dux;
     delete [] duy;
     delete [] duz;
     delete [] tmp;
+
+    _zfp_wfld.deallocate(pfor_nm1);
+    _zfp_wfld.deallocate(pfor_n);
+    _zfp_wfld.deallocate(pfor_np1);
 }
 
 
@@ -1472,7 +1523,7 @@ void nl_we_op_a::convert_model(data_t * m, int n, bool forward) const
     }
 }
 
-void nl_we_op_a::compute_gradients(const data_t * model, const data_t * u_full, const data_t * curr, data_t * tmp, data_t * grad, const param &par, int nx, int ny, int nz, int it, data_t dx, data_t dy, data_t dz, data_t dt) const
+void nl_we_op_a::compute_gradients(const data_t * model, const data_t ** u_full, const data_t * curr, data_t * tmp, data_t * grad, const param &par, int nx, int ny, int nz, int it, data_t dx, data_t dy, data_t dz, data_t dt) const
 {
     // Grad_K-1 = adjoint.H.Ht.forward_tt
     // Grad_K = -(1/K^2).Grad_K-1
@@ -1480,12 +1531,13 @@ void nl_we_op_a::compute_gradients(const data_t * model, const data_t * u_full, 
     // The H quadrature will be applied elsewhere to the final gradients (all shots included)
 
     int nxyz = nx*ny*nz;
-    int itlocal = it;
-    data_t (*pm) [nxyz] = (data_t (*)[nxyz]) model;
-    data_t (*pfor) [nxyz] = (data_t (*) [nxyz]) u_full;
-    const data_t *padj = curr;
-    data_t (*temp) [nxyz] = (data_t (*)[nxyz]) tmp;
-    data_t (*g) [nxyz] = (data_t (*)[nxyz]) grad;
+    int itlocal = 1;
+    data_t (* __restrict pm) [nxyz] = (data_t (*)[nxyz]) model;
+    // data_t (*pfor) [nxyz] = (data_t (*) [nxyz]) u_full;
+    const data_t * pfor [3] = {u_full[0], u_full[1], u_full[2]};
+    const data_t * padj = curr;
+    data_t (* __restrict temp) [nxyz] = (data_t (*)[nxyz]) tmp;
+    data_t (* __restrict g) [nxyz] = (data_t (*)[nxyz]) grad;
 
     Dx(false, pfor[itlocal], temp[0], nx, ny, nz, dx, 0, nx, 0, ny, 0, nz); // forward_x
     Dy(false, pfor[itlocal], temp[1], nx, ny, nz, dy, 0, nx, 0, ny, 0, nz); // forward_y
@@ -1523,7 +1575,7 @@ void nl_we_op_a::compute_gradients(const data_t * model, const data_t * u_full, 
     }
 }
 
-void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, data_t * rcv, const injector * inj, const injector * ext, data_t * full_wfld, data_t * grad, const param &par, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t ox, data_t oy, data_t oz) const
+void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, data_t * rcv, const injector * inj, const injector * ext, data_t * grad, const param &par, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t ox, data_t oy, data_t oz) const
 {
     // wavefields allocations and pointers
     int nxyz=nx*ny*nz;
@@ -1536,13 +1588,16 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
     data_t (* __restrict u_full) [nxyz];
     data_t * __restrict tmp;
 
-    if (par.sub>0) u_full = (data_t (*) [nxyz]) full_wfld;
     if (grad != nullptr) 
     {
         tmp = new data_t[6*nxyz];
         memset(tmp, 0, 6*nxyz*sizeof(data_t));
     }
 	const data_t* mod[2] = {model, model+nxyz};
+    data_t * pfor_nm1 = nullptr, * pfor_n = nullptr, * pfor_np1 = nullptr;
+    _zfp_wfld.allocate(pfor_nm1);
+    _zfp_wfld.allocate(pfor_n);
+    _zfp_wfld.allocate(pfor_np1);
 
     // free surface stiffness
     data_t alpha = 0.2508560249 / par.free_surface_stiffness;
@@ -1556,7 +1611,8 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
     for (int it=0; it<par.nt-1; it++)
     {
         // copy the current wfld to the full wfld vector
-        if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) memcpy(u_full[it/par.sub], curr, nxyz*sizeof(data_t));
+        // if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) memcpy(u_full[it/par.sub], curr, nxyz*sizeof(data_t));
+        if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) _zfp_wfld.set(curr[0], it/par.sub);
 
         // extract receivers
         if (grad == nullptr)
@@ -1565,7 +1621,14 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
         }
 
         // compute FWI gradients except for first and last time samples
-        if ((grad != nullptr) && (par.sub>0) && ((par.nt-1-it)%par.sub==0) && it!=0) compute_gradients(model, full_wfld, curr[0], tmp, grad, par, nx, ny, nz, (par.nt-1-it)/par.sub, dx, dy, dz, par.sub*par.dt);
+        if ((grad != nullptr) && (par.sub>0) && ((par.nt-1-it)%par.sub==0) && it!=0) {
+            int itlocal = (par.nt-1-it)/par.sub;
+            _zfp_wfld.get(pfor_nm1, itlocal-1);
+            _zfp_wfld.get(pfor_n, itlocal);
+            _zfp_wfld.get(pfor_np1, itlocal+1);
+            const data_t * pfor[3] = {pfor_nm1, pfor_n, pfor_np1};
+            compute_gradients(model, pfor, curr[0], tmp, grad, par, nx, ny, nz, itlocal, dx, dy, dz, par.sub*par.dt);
+        }
 
         // apply spatial SBP operators
         // mu here designates the second model parameter, i.e. reciprocal of density 1/rho 
@@ -1707,7 +1770,8 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
     }
 
     // copy the last wfld to the full wfld vector (not needed)
-    if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) memcpy(u_full[(par.nt-1)/par.sub], curr, nxyz*sizeof(data_t));
+    // if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) memcpy(u_full[(par.nt-1)/par.sub], curr, nxyz*sizeof(data_t));
+    if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) _zfp_wfld.set(curr[0], (par.nt-1)/par.sub);
 
     // extract receivers last sample
     if (grad==nullptr)
@@ -1716,6 +1780,18 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
     }
 
     // last sample gradient
-    if ((grad != nullptr) && (par.sub>0) ) compute_gradients(model, full_wfld, curr[0], tmp, grad, par, nx, ny, nz, 0, dx, dy, dz, par.sub*par.dt);
+    if ((grad != nullptr) && (par.sub>0) ) {
+        _zfp_wfld.get(pfor_n, 0);
+        _zfp_wfld.get(pfor_np1, 1);
+        const data_t * pfor[3] = {pfor_nm1, pfor_n, pfor_np1};
+        compute_gradients(model, pfor, curr[0], tmp, grad, par, nx, ny, nz, 0, dx, dy, dz, par.sub*par.dt);
+    }
+
+    delete [] u;
+    if (grad != nullptr) delete [] tmp;
+
+    _zfp_wfld.deallocate(pfor_nm1);
+    _zfp_wfld.deallocate(pfor_n);
+    _zfp_wfld.deallocate(pfor_np1);
     
 }

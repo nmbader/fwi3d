@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
 
 #Name of cmake project
-project(fwi3d LANGUAGES CXX)
+project(fwi3d LANGUAGES CXX C)
 
 
 #Require c++11
@@ -25,6 +25,14 @@ if (MPI_FOUND)
     include_directories( ${MPI_CXX_INCLUDE_PATH} )
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_MPI")
 endif(MPI_FOUND)
+
+#optional ZFP (compression library)
+#if found openMP may be required based on how ZFP is built ; if openMP is unavailable, rebuild ZFP with -DZFP_WITH_OPENMP=OFF
+find_package(zfp)
+if (ZFP_FOUND)
+    include_directories( ${ZFP_INCLUDE_DIRS} ${ZFP_INCLUDE_DIRS}/zfp )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_ZFP")
+endif(ZFP_FOUND)
 
 if(ENABLE_CUDA)
     enable_language(CUDA)
