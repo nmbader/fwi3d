@@ -25,6 +25,8 @@ struct param{
     data_t gl=0;
 
     // source mechanism and receiver type
+    // for output displacement in meters, force should be in 1e12 N and moment tensor should be in 1e15 N.m
+    // for output strain m/m, force should be in 1e15 N and moment tensor should be in 1e18 N.m
     bool mt=false;
     data_t fangle=0, fazimuth=0;
     data_t mxx=1, myy=1, mzz=1, mxy=1, mxz=1, myz=1;
@@ -34,7 +36,7 @@ struct param{
     int bc_top=1, bc_bottom=1, bc_left=1, bc_right=1, bc_front=1, bc_back=1, taper_top=0, taper_bottom=0, taper_left=0, taper_right=0, taper_front=0, taper_back=0;
     data_t free_surface_stiffness=1.05, taper_strength=0.05;
 
-    // model bounds
+    // model bounds (km/s and g/cc)
     data_t vpmin=0.2, vpmax=8, vsmin=0.1, vsmax=5, rhomin=0.1, rhomax=8, deltamin=-0.5, deltamax=1, epsilonmin=0, epsilonmax=1, gammamin=0, gammamax=1;
     data_t vmax=8, vmin=0.1;
 

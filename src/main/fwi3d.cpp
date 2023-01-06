@@ -28,6 +28,9 @@ int main(int argc, char **argv){
     int verbose=par.verbose;
     if (rank>0) par.verbose=0;
 
+    time_t t1 = time(NULL);
+    if (par.verbose>0) fprintf(stderr,"\n====================\n%s\n====================\n",ctime(&t1));
+
 // Set the maximum number of threads
     if (par.nthreads>0) omp_set_num_threads(par.nthreads);
 
@@ -397,9 +400,12 @@ if (par.bsplines)
 
     delete L;
     delete prob;
+// ----------------------------------------------------------------------------------------//
 
     mpiWrapper::finalize();
-// ----------------------------------------------------------------------------------------//
+
+    time_t t2 = time(NULL);
+    if (par.verbose>0) fprintf(stderr,"\n====================\n%s\n====================\n",ctime(&t2));
 
 return 0;
 }

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <time.h>
 #include "we_op.hpp"
 #include "IO.hpp"
 #include "mpiWrapper.hpp"
@@ -26,6 +27,9 @@ int main(int argc, char **argv){
     par.compression_rate=0;
     int verbose=par.verbose;
     if (rank>0) par.verbose=0;
+
+    time_t t1 = time(NULL);
+    if (par.verbose>0) fprintf(stderr,"\n====================\n%s\n====================\n",ctime(&t1));
 
 // Set the maximum number of threads
     if (par.nthreads>0) omp_set_num_threads(par.nthreads);
@@ -82,16 +86,16 @@ int main(int argc, char **argv){
         op->forward(false,model,rcv);
 
 // Save one full wavefield if requested
-        if ((rank==0) && (wavefield_file!="none") && (par.sub)>0) write<data_t>(op->_full_wfld, wavefield_file, par.format, par.datapath);
+        if ((rank==0) && (wavefield_file!="none") && (par.sub)>0) write<data_t>(op->_zfp_wfld._full_wfld, wavefield_file, par.format, par.datapath);
         delete op;
 
 // Copy to the full container
         if (rank!=0) {
-            mpiWrapper::send(rcv->getCVals(), rcv->getN123(), 0, rank);
+            mpiWrapper::send(rcv->getCVals(), rcv->getN123(), 0, s);
         }
         else {
-            for (int task=1; task<size && task<par.ns; task++){
-                mpiWrapper::recv(allrcv->getVals()+ntr_cumul[s+task]*T.n, par.rxyz[s+task].size()*par.nrcomp*T.n, task, task);
+            for (int task=1; task<size && s+task<par.ns ; task++){
+                mpiWrapper::recv(allrcv->getVals()+ntr_cumul[s+task]*T.n, par.rxyz[s+task].size()*par.nrcomp*T.n, task, s+task);
             }
             memcpy(allrcv->getVals()+ntr_cumul[s]*T.n, rcv->getCVals(),rcv->getN123()*sizeof(data_t));
         }
@@ -100,6 +104,9 @@ int main(int argc, char **argv){
     if ((rank==0) && (output_file!="none")) write<data_t>(allrcv, output_file, par.format, par.datapath);
 
     mpiWrapper::finalize();
+
+    time_t t2 = time(NULL);
+    if (par.verbose>0) fprintf(stderr,"\n====================\n%s\n====================\n",ctime(&t2));
     
 return 0;
 }
