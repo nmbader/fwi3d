@@ -20,7 +20,6 @@ public:
     param _par;
     std::shared_ptr<vecReg<data_t> > _src;
     std::shared_ptr<vecReg<data_t> > _allsrc;
-    // std::shared_ptr<vecReg<data_t> > _full_wfld;
     mutable zfpWrapper _zfp_wfld;
 
     nl_we_op(){}

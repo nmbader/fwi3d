@@ -10,7 +10,7 @@
 struct zfpWrapper
 {
 private:
-    int nx, ny, nz, nc, nt, rate;
+    int nx=1, ny=1, nz=1, nc=1, nt=1, rate=0;
 
 public:
 
@@ -23,7 +23,7 @@ public:
 
     void initialize(const hypercube<data_t> & hyper, int compression_rate){
 
-        successCheck(hyper.getNdim()==5,"The initialization of the full wavefield must have 5 dimensions, Z, X, Y, Component, Time\n");
+        successCheck(hyper.getNdim()==5,"The hypercube for initializing the zfpWrapper must have 5 dimensions, Z, X, Y, Component, Time\n");
         std::vector<axis<data_t> > axes = hyper.getAxes();
         nx = axes[1].n;
         nz = axes[0].n;

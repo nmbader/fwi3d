@@ -292,7 +292,7 @@ void analyzeModel(const hypercube<data_t> &domain, std::shared_ptr<vecReg<data_t
                 model->clip(par.deltamin,par.deltamax,3*ny*nx*nz,4*ny*nx*nz);
                 model->clip(par.epsilonmin,par.epsilonmax,4*ny*nx*nz,5*ny*nx*nz);
                 model->clip(par.gammamin,par.gammamax,5*ny*nx*nz,6*ny*nx*nz);
-                epsmax = model->max(4*ny*nx*nz,5*ny*nx*nz);
+                // epsmax = model->max(4*ny*nx*nz,5*ny*nx*nz);
             }
 
             bool check=true;
@@ -321,11 +321,27 @@ void analyzeModel(const hypercube<data_t> &domain, std::shared_ptr<vecReg<data_t
                 fprintf(stderr,"Vp bounds after hard clipping are %.2f - %.2f km/s\n",vpmin,vpmax);
                 fprintf(stderr,"Vs bounds after hard clipping are %.2f - %.2f km/s\n",vsmin,vsmax);
                 fprintf(stderr,"Rho bounds after hard clipping are %.2f - %.2f g/cc\n",rhomin,rhomax);
+                if (par.nmodels==6){
+                    fprintf(stderr,"Delta bounds after hard clipping are %.2f - %.2f\n",delmin,delmax);
+                    fprintf(stderr,"Epsilon bounds after hard clipping are %.2f - %.2f\n",epsmin,epsmax);
+                    fprintf(stderr,"Gamma bounds after hard clipping are %.2f - %.2f\n",gammamin,gammamax);
+                }
             }
         }
         par.vmax=vpmax;
         par.vmin=vsmin;
-        if (par.nmodels==6) par.vmax *= sqrt(1+2*epsmax);
+
+        // compute the maximum horizontal P-wave velocity
+        if (par.nmodels==6) {
+            std::shared_ptr<vecReg<data_t> > temp = std::make_shared<vecReg<data_t> >(hypercube<data_t>(Z,X,Y));
+            data_t * ptemp = temp->getVals();
+            const data_t * pvp = model->getCVals();
+            const data_t * pe = model->getCVals()+4*ny*nx*nz;
+            #pragma omp parallel for
+            for (int i=0; i<nx*ny*nz; i++) ptemp[i] = pvp[i]*sqrt(1+2*pe[i]);
+            
+            par.vmax = temp->max();
+        }
     }
 
     else
@@ -541,12 +557,7 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
     data_t (* __restrict u_z) [nxyz] = (data_t (*)[nxyz]) duz;
     data_t (* __restrict u_full) [3][nxyz];
     data_t * __restrict tmp;
-    // data_t * full_wfld = nullptr;
 
-    // if (_par.sub>0) {
-    //     full_wfld = _full_wfld->getVals();
-    //     u_full = (data_t (*) [3][nxyz]) _full_wfld->getVals();
-    // }
     if (grad != nullptr) 
     {
         tmp = new data_t[9*nxyz];
@@ -584,7 +595,6 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
     for (int it=0; it<par.nt-1; it++)
     {
         // copy the current wfld to the full wfld vector
-        // if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) memcpy(u_full[it/par.sub], curr, 3*nxyz*sizeof(data_t));
         if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) _zfp_wfld.set(curr[0], it/par.sub);
 
         // extract receivers
@@ -801,7 +811,6 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
     }
 
     // copy the last wfld to the full wfld vector
-    // if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) memcpy(u_full[(par.nt-1)/par.sub], curr, 3*nxyz*sizeof(data_t));
     if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) _zfp_wfld.set(curr[0], (par.nt-1)/par.sub);
 
     // extract receivers last sample
@@ -844,11 +853,6 @@ void nl_we_op_e::apply_forward(bool add, const data_t * pmod, data_t * pdat)
     axis<data_t> Z = _domain.getAxis(1);
     hypercube<data_t> domain = *_src->getHyper();
 
-    // if (_par.sub>0){
-    //     if (_par.nmodels>=3) _full_wfld=std::make_shared<vecReg<data_t> > (hypercube<data_t>(Z,X,Y,axis<data_t>(3,0,1), axis<data_t>(1+_par.nt/_par.sub,0,_par.dt*_par.sub)));
-    //     else _full_wfld=std::make_shared<vecReg<data_t> > (hypercube<data_t>(Z,X,Y, axis<data_t>(1+_par.nt/_par.sub,0,_par.dt*_par.sub)));
-    //     _full_wfld->zero();
-    // }
     if (_par.sub>0) _zfp_wfld.initialize(hypercube<data_t>(Z,X,Y,axis<data_t>(1+2*(_par.nmodels>=3),0,1), axis<data_t>(1+_par.nt/_par.sub,0,_par.dt*_par.sub)), _par.compression_rate);
 
     // setting up and apply the time resampling operator
@@ -1202,12 +1206,7 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
     data_t (* __restrict u_z) [nxyz] = (data_t (*)[nxyz]) duz;
     data_t (* __restrict u_full) [3][nxyz];
     data_t * __restrict tmp;
-    // data_t * full_wfld = nullptr;
 
-    // if (_par.sub>0) {
-    //     full_wfld = _full_wfld->getVals();
-    //     u_full = (data_t (*) [3][nxyz]) _full_wfld->getVals();
-    // }
     if (grad != nullptr) 
     {
         tmp = new data_t[9*nxyz];
@@ -1222,6 +1221,7 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
     _zfp_wfld.allocate(pfor_nm1);
     _zfp_wfld.allocate(pfor_n);
     _zfp_wfld.allocate(pfor_np1);
+
     
     // source and receiver components for injection/extraction
     int nscomp = par.nscomp;
@@ -1244,7 +1244,6 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
     for (int it=0; it<par.nt-1; it++)
     {
         // copy the current wfld to the full wfld vector
-        // if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) memcpy(u_full[it/par.sub], curr, 3*nxyz*sizeof(data_t));
         if ((par.sub>0) && (it%par.sub==0) && (grad==nullptr)) _zfp_wfld.set(curr[0], it/par.sub);
 
         // extract receivers
@@ -1471,7 +1470,6 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
     }
 
     // copy the last wfld to the full wfld vector
-    // if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) memcpy(u_full[(par.nt-1)/par.sub], curr, 3*nxyz*sizeof(data_t));
     if ((par.sub>0) && ((par.nt-1)%par.sub==0) && (grad==nullptr)) _zfp_wfld.set(curr[0], (par.nt-1)/par.sub);
 
     // extract receivers last sample
