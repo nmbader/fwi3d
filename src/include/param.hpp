@@ -27,6 +27,8 @@ struct param{
     // source mechanism and receiver type
     // for output displacement in meters, force should be in 1e12 N and moment tensor should be in 1e15 N.m
     // for output strain m/m, force should be in 1e15 N and moment tensor should be in 1e18 N.m
+    // for acoustic modeling the output pressure is in Pa, source is -div(f/rho) and should be in s-2
+    // elastic modulii are in GPa, distances in km, velocities in km/s, and density in g/cc
     bool mt=false;
     data_t fangle=0, fazimuth=0;
     data_t mxx=1, myy=1, mzz=1, mxy=1, mxz=1, myz=1;

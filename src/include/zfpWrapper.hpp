@@ -10,11 +10,11 @@
 struct zfpWrapper
 {
 private:
-    int nx=1, ny=1, nz=1, nc=1, nt=1, rate=0;
+    int nx=1, ny=1, nz=1, nc=1, nt=1, rate=0, ot=0, dt=1;
 
 public:
 
-    std::shared_ptr<vecReg<data_t> > _full_wfld;
+    std::vector<std::shared_ptr<vecReg<data_t> > > _full_wfld;
 #ifdef ENABLE_ZFP
     std::vector<std::vector<zfp::array3<data_t> > > _full_wfld_compressed;
 #endif
@@ -30,6 +30,8 @@ public:
         ny = axes[2].n;
         nc = axes[3].n;
         nt = axes[4].n;
+        ot = axes[4].o;
+        dt = axes[4].d;
         rate = compression_rate;
 
 #ifdef ENABLE_ZFP
@@ -37,14 +39,15 @@ public:
             _full_wfld_compressed = std::vector<std::vector<zfp::array3<data_t> > >(nt, std::vector<zfp::array3<data_t> >(nc, zfp::array3<data_t>(nz,nx,ny,rate)));
         }
         else{
-            if (axes[3].n > 1) _full_wfld=std::make_shared<vecReg<data_t> >(hyper);
-            else _full_wfld=std::make_shared<vecReg<data_t> >(hypercube<data_t>(axes[0], axes[1], axes[2], axes[4]));
-            _full_wfld->zero();
+            for (int it=0; it<nt; it++){
+                std::shared_ptr<vecReg<data_t> > v = std::make_shared<vecReg<data_t> >(hypercube<data_t>(axes[0], axes[1], axes[2], axes[3]));
+                v->zero();
+                _full_wfld.push_back(v);
+            }
         }
 #else
-        if (axes[3].n > 1) _full_wfld=std::make_shared<vecReg<data_t> >(hyper);
-        else _full_wfld=std::make_shared<vecReg<data_t> >(hypercube<data_t>(axes[0], axes[1], axes[2], axes[4]));
-        _full_wfld->zero();
+        _full_wfld = std::vector<std::shared_ptr<vecReg<data_t> > >(nt, std::shared_ptr<vecReg<data_t> >(new vecReg<data_t>(hypercube<data_t>(axes[0], axes[1], axes[2], axes[3]))));
+        for (int it=0; it<nt; it++) _full_wfld[it]->zero();
 #endif
 
     }
@@ -71,6 +74,8 @@ public:
 
     void set(const data_t * v, int it) {
 
+        if (it>nt-1) return;
+
         int nxyz = nx*ny*nz;
 
 #ifdef ENABLE_ZFP
@@ -80,16 +85,16 @@ public:
             }
         }
         else{
-            data_t (* pfull) [nc][nxyz] = (data_t (*) [nc][nxyz]) _full_wfld->getVals();
-            memcpy(pfull[it], v, nc*nxyz*sizeof(data_t));
+            memcpy(_full_wfld[it]->getVals(), v, nc*nxyz*sizeof(data_t));
         }
 #else
-        data_t (* pfull) [nc][nxyz] = (data_t (*) [nc][nxyz]) _full_wfld->getVals();
-        memcpy(pfull[it], v, nc*nxyz*sizeof(data_t));
+        memcpy(_full_wfld[it]->getVals(), v, nc*nxyz*sizeof(data_t));
 #endif
     }
 
     void get(data_t * &v, int it) const {
+
+        if (it>nt-1) return;
 
         int nxyz = nx*ny*nz;
 
@@ -100,11 +105,23 @@ public:
             }
         }
         else{
-            v = _full_wfld->getVals() + it*nc*nxyz;
+            v = _full_wfld[it]->getVals();
         }
 #else
-        v = _full_wfld->getVals() + it*nc*nxyz;
+        v = _full_wfld[it]->getVals();
 #endif
+    }
+
+    void getFullWfld(std::shared_ptr<vecReg<data_t> > &full) const{
+
+        std::vector<axis<data_t> > axes = _full_wfld[0]->getHyper()->getAxes();
+        axis<data_t> T(nt,ot,dt);
+        full = std::make_shared<vecReg<data_t> >(hypercube<data_t>(axes[0],axes[1],axes[2],axes[3],T));
+
+        int ncxyz = nc*nx*ny*nz;
+        data_t (* pfull) [ncxyz] = (data_t (*) [ncxyz]) full->getVals();
+        for (int it=0; it<nt; it++) memcpy(pfull[it], _full_wfld[it]->getCVals(), ncxyz*sizeof(data_t));
+
     }
 
 };
