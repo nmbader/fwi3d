@@ -45,6 +45,142 @@ public:
 };
 
 
+// #################################################### Linear part ##################################################################
+// ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// #################################################### ############### ############################################################## 
+
+// Linear least-squares problem: f(m)=1/2.|Lm-d|^2
+class llsq : public optimization{
+protected:
+    std::shared_ptr<vecReg<data_t> > _dr; // residual direction
+    loper * _L; // linear operator
+
+public:
+    llsq(){}
+    virtual ~llsq(){}
+    llsq(loper * L, std::shared_ptr<vecReg<data_t> > m, std::shared_ptr<vecReg<data_t> > d){
+       successCheck(L->checkDomainRange(m,d),"Vectors hypercube do not match the operator domain and range\n");
+        _L = L;
+        _m = m;
+        _d = d;        
+    }
+    virtual void initDRes() {
+        _dr = std::make_shared<vecReg<data_t> > (*_d->getHyper());
+        _dr->zero();
+    }
+    std::shared_ptr<vecReg<data_t> > getDat(){return _d;}
+    std::shared_ptr<vecReg<data_t> > getDRes(){return _dr;}
+
+    // Lm - d
+    virtual void res(){
+        _L->forward(false,_m,_r);
+        _r->scaleAdd(_d,1,-1);
+    }
+    // L'.(Lm-d)
+    virtual void grad() {
+        _L->adjoint(false,_g,_r);
+    }
+    virtual void dres(const std::shared_ptr<vecReg<data_t> > p){
+        _L->forward(false,p,_dr);
+    }
+};
+
+// Linear least-squares problem with regularization: f(m)=1/2.|Lm-d|^2 + 1/2.lambda^2.|D(m-m_prior)|^2
+class llsq_reg : public llsq{
+protected:
+    loper * _D; // regularization linear operator
+    data_t _lambda; // regularization damping parameter
+    std::shared_ptr<vecReg<data_t> > _Dmp; // prior model pre-multiplied by D
+
+public:
+    llsq_reg(){}
+    virtual ~llsq_reg(){}
+    llsq_reg(loper * L, loper * D, std::shared_ptr<vecReg<data_t> > m, std::shared_ptr<vecReg<data_t> > d, const data_t lambda, const std::shared_ptr<vecReg<data_t> > mprior=nullptr){
+       successCheck(L->checkDomainRange(m,d),"Vectors hypercube do not match the operator domain and range\n");
+       successCheck(D->checkDomainRange(m,m),"Vectors hypercube do not match the operator domain and range\n");
+        successCheck(m->getN123()==mprior->getN123(),"Model and prior model do not have the same number of samples\n");
+        _L = L;
+        _D = D;
+        _m = m;
+        _d = d;
+        _lambda = lambda;
+
+        _Dmp = std::make_shared<vecReg<data_t> > (*_D->getRange());
+        _Dmp->zero();
+        if (mprior==nullptr) _D->forward(false, _m, _Dmp); // mprior assumed = m0 if not provided
+        else _D->forward(false, mprior, _Dmp);
+    }
+    void initRes() {
+        _r = std::make_shared<vecReg<data_t> >(hypercube<data_t>(_d->getN123()+_m->getN123()));
+        _r->zero();
+    }
+    void initDRes() {
+        _dr = std::make_shared<vecReg<data_t> >(hypercube<data_t>(_d->getN123()+_m->getN123()));
+        _dr->zero();
+    }
+    // Lm - d ; lambda*D(m - m_prior)
+    void res(){
+        int nd = _d->getN123();
+        int nm = _m->getN123();
+        data_t * pr = _r->getVals();
+        const data_t * pd = _d->getCVals();
+        const data_t * pm = _m->getCVals();
+        const data_t * pdmp = _Dmp->getCVals();
+        
+        _L->apply_forward(false,pm,pr);
+        _D->apply_forward(false,pm,pr+nd);
+
+        #pragma omp parallel for
+        for (int i=0; i<nd; i++) pr[i] -= pd[i];
+        #pragma omp parallel for
+        for (int i=0; i<nm; i++) pr[nd+i] = _lambda*(pr[nd+i] - pdmp[i]);
+    }
+    // L'(Lm-d) + lambda.D'.D(m-m_prior)
+    void grad() {
+        _D->apply_adjoint(false,_g->getVals(),_r->getVals()+_d->getN123());
+        _g->scale(_lambda);
+        _L->apply_adjoint(true,_g->getVals(),_r->getVals());
+    }
+    void dres(const std::shared_ptr<vecReg<data_t> > p){
+        int nd = _d->getN123();
+        int nm = _m->getN123();
+        data_t * pdr = _dr->getVals();
+        _L->apply_forward(false,p->getVals(),_dr->getVals());
+        _D->apply_forward(false,p->getVals(),_dr->getVals()+nd);
+        _dr->scale(_lambda,nd,nd+nm);
+    }
+
+};
+
+// Linear least-squares problem for SPD system: f(m)=1/2.m'.L.m -d'.m   L is SPD
+// The minimizer is solution to Lm = d (m = L^-1.d)
+class lspd : public llsq{
+public:
+    lspd(){}
+    virtual ~lspd(){}
+    lspd(loper * L, std::shared_ptr<vecReg<data_t> > m, std::shared_ptr<vecReg<data_t> > d){
+       successCheck(L->checkDomainRange(m,d),"Vectors hypercube do not match the operator domain and range\n");
+       successCheck(m->getN123()==d->getN123(),"Model and data vectors must be of same size for SPD system\n");
+        _L = L;
+        _m = m;
+        _d = d;
+    }
+    data_t getFunc(){
+        data_t * pr = _r->getVals();
+        data_t * pm = _m->getVals();
+        data_t * pd = _d->getVals();
+        data_t f = 0;
+        for (int i=0; i<_m->getN123(); i++) f += 0.5*pm[i]*(pr[i]-pd[i]);
+        return f;
+    }
+    // Lm - d
+    void grad() {
+        _g = _r;
+    }
+    data_t getZero(){return M_INF;}
+};
+
+
 // #################################################### Non-linear part ################################################################## //
 // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// //
 // #################################################### ############### ################################################################## //

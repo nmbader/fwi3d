@@ -13,6 +13,7 @@ set(DEV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/dev)
 set(SRC_FWI3D ${SRC_DIR}/injector.cpp
                 ${SRC_DIR}/misc.cpp
                 ${SRC_DIR}/nlsolver.cpp
+                ${SRC_DIR}/lsolver.cpp
                 ${SRC_DIR}/operator.cpp
                 ${SRC_DIR}/param.cpp
                 ${SRC_DIR}/spatial_operators.cpp

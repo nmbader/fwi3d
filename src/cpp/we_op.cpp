@@ -807,7 +807,8 @@ void nl_we_op_e::propagate(bool adj, const data_t * model, const data_t * src, d
         curr=next;
         next=bucket;
 
-        if ((it+1) % pct10 == 0 && par.verbose>2) fprintf(stderr,"Propagation progress = %d\%\n",10*(it+1)/pct10);
+        if ((it+1) % pct10 == 0 && par.verbose>2) fprintf(stderr,"Propagation progress = %d\%\n",100*(it+1)/(par.nt-1));
+        else if (it == par.nt-2 && par.verbose>2) fprintf(stderr,"Propagation progress = 100\%\n");
     }
 
     // copy the last wfld to the full wfld vector
@@ -1466,7 +1467,8 @@ void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src,
         curr=next;
         next=bucket;
 
-        if ((it+1) % pct10 == 0 && par.verbose>2) fprintf(stderr,"Propagation progress = %d\%\n",10*(it+1)/pct10);
+        if ((it+1) % pct10 == 0 && par.verbose>2) fprintf(stderr,"Propagation progress = %d\%\n",100*(it+1)/(par.nt-1));
+        else if (it == par.nt-2 && par.verbose>2) fprintf(stderr,"Propagation progress = 100\%\n");
     }
 
     // copy the last wfld to the full wfld vector
@@ -1764,7 +1766,8 @@ void nl_we_op_a::propagate(bool adj, const data_t * model, const data_t * src, d
         curr=next;
         next=bucket;
 
-        if ((it+1) % pct10 == 0 && par.verbose>2) fprintf(stderr,"Propagation progress = %d\%\n",10*(it+1)/pct10);
+        if ((it+1) % pct10 == 0 && par.verbose>2) fprintf(stderr,"Propagation progress = %d\%\n",100*(it+1)/(par.nt-1));
+        else if (it == par.nt-2 && par.verbose>2) fprintf(stderr,"Propagation progress = 100\%\n");
     }
 
     // copy the last wfld to the full wfld vector (not needed)
