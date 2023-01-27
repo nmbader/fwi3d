@@ -86,7 +86,12 @@ int main(int argc, char **argv){
         op->forward(false,model,rcv);
 
 // Save one full wavefield if requested
-        if ((rank==0) && (wavefield_file!="none") && (par.sub)>0) write<data_t>(op->_zfp_wfld._full_wfld, wavefield_file, par.format, par.datapath);
+        if ((rank==0) && (wavefield_file!="none") && (op->_par.sub)>0) {
+            std::shared_ptr<vecReg<data_t> > full;
+            op->_zfp_wfld.getFullWfld(full);
+            write<data_t>(full, wavefield_file, par.format, par.datapath);
+        }
+        
         delete op;
 
 // Copy to the full container

@@ -92,7 +92,7 @@ public:
 		_axes.emplace_back(axis<T1>(n3));
 		_axes.emplace_back(axis<T1>(n4));
 		_axes.emplace_back(axis<T1>(n5));
-		_n123=n1*n2*n3*n4*n5;
+		_n123=(long)n1*(long)n2*(long)n3*(long)n4*(long)n5;
 	}
     hypercube(const long n1, const long n2, const long n3, const long n4, const long n5, const long n6){
 		_axes.emplace_back(axis<T1>(n1));
@@ -101,7 +101,7 @@ public:
 		_axes.emplace_back(axis<T1>(n4));
 		_axes.emplace_back(axis<T1>(n5));
 		_axes.emplace_back(axis<T1>(n6));
-		_n123=n1*n2*n3*n4*n5*n6;
+		_n123=(long)n1*(long)n2*(long)n3*(long)n4*(long)n5*(long)n6;
 	}
 	hypercube(const axis<T1> &a1) {
 		_axes.push_back(a1);

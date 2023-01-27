@@ -292,7 +292,12 @@ void analyzeModel(const hypercube<data_t> &domain, std::shared_ptr<vecReg<data_t
                 model->clip(par.deltamin,par.deltamax,3*ny*nx*nz,4*ny*nx*nz);
                 model->clip(par.epsilonmin,par.epsilonmax,4*ny*nx*nz,5*ny*nx*nz);
                 model->clip(par.gammamin,par.gammamax,5*ny*nx*nz,6*ny*nx*nz);
-                // epsmax = model->max(4*ny*nx*nz,5*ny*nx*nz);
+                delmin = model->min(3*ny*nx*nz,4*ny*nx*nz);
+                delmax = model->max(3*ny*nx*nz,4*ny*nx*nz);
+                epsmin = model->min(4*ny*nx*nz,5*ny*nx*nz);
+                epsmax = model->max(4*ny*nx*nz,5*ny*nx*nz);
+                gammamin = model->min(5*ny*nx*nz,6*ny*nx*nz);
+                gammamax = model->max(5*ny*nx*nz,6*ny*nx*nz);
             }
 
             bool check=true;
@@ -1184,6 +1189,7 @@ void nl_we_op_vti::compute_gradients(const data_t * model, const data_t ** u_ful
                             + padj[2][i]*( -pfor[itlocal][2][i]+pfor[itlocal-1][2][i]) ); // rho gradient
         }
     }
+
 }
 
 void nl_we_op_vti::propagate(bool adj, const data_t * model, const data_t * src, data_t * rcv, const injector * inj, const injector * ext, data_t * grad, const param &par, int nx, int ny, int nz, data_t dx, data_t dy, data_t dz, data_t ox, data_t oy, data_t oz) const
