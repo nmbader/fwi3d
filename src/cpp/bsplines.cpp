@@ -119,7 +119,7 @@ void fillin1d(std::shared_ptr<vecReg<data_t> > c, const std::shared_ptr<vecReg<d
     for (int iy=0; iy<ny; iy++){
         for (int iz=0; iz<Z.n; iz++){
             iz2 = floor((cz[iz]-Z2.o)/Z2.d);
-            iz3 = std::min(Z.n-1,iz2+1);
+            iz3 = std::min(Z2.n-1,iz2+1);
             wz = (cz[iz] - Z2.o - iz2*Z2.d)/Z2.d;
             pc[iy*Z.n+iz] = (1-wz)*pv[iy*Z2.n+iz2] + wz*pv[iy*Z2.n+iz3];
         }

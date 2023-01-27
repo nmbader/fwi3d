@@ -9,7 +9,7 @@ struct param{
     // time parameters
     int nt=0;
     int sub=0;
-    data_t courant=0.4, dt=-1, tmax=0, fmax=10;
+    data_t courant=0.5, dt=-1, tmax=0, fmax=10;
     std::string resampling = "sinc";
     int sinc_half_length=11;
 
