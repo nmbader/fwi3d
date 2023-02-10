@@ -152,6 +152,7 @@ class bsplines3d : public loper {
 protected:
     std::vector<data_t> _kx, _ky, _kz; // knot vectors
     std::vector<int> _kxmin, _kymin, _kzmin; // first useful index of the knot vectors
+    std::vector<std::vector<data_t> > _N3x, _N3y, _N3z; // pre-computed B-spline weights for efficiency
 public:
     bsplines3d(){}
     ~bsplines3d(){}
@@ -184,18 +185,18 @@ public:
         _ky = ky;
         _kz = kz;
 
-        _kx[kx.size()-1] += 1e-06;
-        _kx[kx.size()-2] += 1e-06;
-        _kx[kx.size()-3] += 1e-06;
-        _kx[kx.size()-4] += 1e-06;
-        _ky[ky.size()-1] += 1e-06;
-        _ky[ky.size()-2] += 1e-06;
-        _ky[ky.size()-3] += 1e-06;
-        _ky[ky.size()-4] += 1e-06;
-        _kz[kz.size()-1] += 1e-06;
-        _kz[kz.size()-2] += 1e-06;
-        _kz[kz.size()-3] += 1e-06;
-        _kz[kz.size()-4] += 1e-06;
+        _kx[kx.size()-1] += 1e-6;
+        _kx[kx.size()-2] += 1e-6;
+        _kx[kx.size()-3] += 1e-6;
+        _kx[kx.size()-4] += 1e-6;
+        _ky[ky.size()-1] += 1e-6;
+        _ky[ky.size()-2] += 1e-6;
+        _ky[ky.size()-3] += 1e-6;
+        _ky[ky.size()-4] += 1e-6;
+        _kz[kz.size()-1] += 1e-6;
+        _kz[kz.size()-2] += 1e-6;
+        _kz[kz.size()-3] += 1e-6;
+        _kz[kz.size()-4] += 1e-6;
 
         axis<data_t> Z = _range.getAxis(1);
         axis<data_t> X = _range.getAxis(2);
@@ -221,6 +222,25 @@ public:
             y = Y.o + i*Y.d;
             while (y > _ky[count]) count++;
             _kymin[i] = count-4;
+        }
+
+        _N3x = std::vector<std::vector<data_t> >(4, std::vector<data_t>(X.n));
+        _N3y = std::vector<std::vector<data_t> >(4, std::vector<data_t>(Y.n));
+        _N3z = std::vector<std::vector<data_t> >(4, std::vector<data_t>(Z.n));
+        #pragma omp parallel for private(x)
+        for (int ix=0; ix<X.n; ix++){
+            x = ix*X.d+X.o;
+            for (int i=0; i<4; i++) _N3x[i][ix]=N3(i+_kxmin[ix],x,_kx);
+        }
+        #pragma omp parallel for private(y)
+        for (int iy=0; iy<Y.n; iy++){
+            y = iy*Y.d+Y.o;
+            for (int i=0; i<4; i++) _N3y[i][iy]=N3(i+_kymin[iy],y,_ky);
+        }
+        #pragma omp parallel for private(z)
+        for (int iz=0; iz<Z.n; iz++){
+            z = iz*Z.d+Z.o;
+            for (int i=0; i<4; i++) _N3z[i][iz]=N3(i+_kzmin[iz],z,_kz);
         }
     }
     bsplines3d * clone() const {
@@ -270,14 +290,14 @@ public:
         _kx = kx;
         _kz = kz;
 
-        _kx[kx.size()-1] += 1e-06;
-        _kx[kx.size()-2] += 1e-06;
-        _kx[kx.size()-3] += 1e-06;
-        _kx[kx.size()-4] += 1e-06;
-        _kz[kz.size()-1] += 1e-06;
-        _kz[kz.size()-2] += 1e-06;
-        _kz[kz.size()-3] += 1e-06;
-        _kz[kz.size()-4] += 1e-06;
+        _kx[kx.size()-1] += 1e-6;
+        _kx[kx.size()-2] += 1e-6;
+        _kx[kx.size()-3] += 1e-6;
+        _kx[kx.size()-4] += 1e-6;
+        _kz[kz.size()-1] += 1e-6;
+        _kz[kz.size()-2] += 1e-6;
+        _kz[kz.size()-3] += 1e-6;
+        _kz[kz.size()-4] += 1e-6;
 
         axis<data_t> Z = _range.getAxis(1);
         axis<data_t> X = _range.getAxis(2);
@@ -337,10 +357,10 @@ public:
         _range = range;
         _kz = kz;
 
-        _kz[kz.size()-1] += 1e-06;
-        _kz[kz.size()-2] += 1e-06;
-        _kz[kz.size()-3] += 1e-06;
-        _kz[kz.size()-4] += 1e-06;
+        _kz[kz.size()-1] += 1e-6;
+        _kz[kz.size()-2] += 1e-6;
+        _kz[kz.size()-3] += 1e-6;
+        _kz[kz.size()-4] += 1e-6;
 
         axis<data_t> Z = _range.getAxis(1);
         data_t z;

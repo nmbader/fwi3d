@@ -1,8 +1,5 @@
 #pragma once
 
-#define ZERO 1e-16
-#define M_INF -1e+16
-
 #include <time.h>
 #include "operator.hpp"
 #include "we_op.hpp"
@@ -11,6 +8,9 @@
 #ifdef CUDA
     #include "cudaMisc.h"
 #endif
+
+#define ZERO 1e-16
+#define M_INF -1e+16
 
 // General class for optimization problems: min(f(m))
 class optimization {
@@ -22,7 +22,6 @@ protected:
 public:
     optimization(){}
     virtual ~optimization(){}
-
     // default functional = 1/2 ||r||^2
     virtual data_t getFunc() {
         return 0.5*_r->norm2();

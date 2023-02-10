@@ -313,17 +313,14 @@ void bsplines3d::apply_forward(bool add, const data_t * pmod, data_t * pdat){
     if (!add) memset(pdat, 0, _range.getN123()*sizeof(data_t));
 
     for (int ic=0; ic<nc; ic++){
-        #pragma omp parallel for private(x,y,z)
+        #pragma omp parallel for
         for (int iy=0; iy<Y.n; iy++){
-            y = iy*Y.d+Y.o;
             for (int ix=0; ix<X.n; ix++){
-                x = ix*X.d+X.o;
                 for (int iz=0; iz<Z.n; iz++){
-                    z = iz*Z.d+Z.o;
-                    for (int k=_kymin[iy]; k<_kymin[iy]+4; k++){
-                        for (int i=_kxmin[ix]; i<_kxmin[ix]+4; i++){
-                            for (int j=_kzmin[iz]; j<_kzmin[iz]+4; j++){
-                                pd[ic][iy][ix][iz] += N3(k,y,_ky)*N3(i,x,_kx)*N3(j,z,_kz)*pm[ic][k][i][j];
+                    for (int k=0; k<4; k++){
+                        for (int i=0; i<4; i++){
+                            for (int j=0; j<4; j++){
+                                pd[ic][iy][ix][iz] += _N3y[k][iy]*_N3x[i][ix]*_N3z[j][iz]*pm[ic][k+_kymin[iy]][i+_kxmin[ix]][j+_kzmin[iz]];
                             }
                         }
                     }
@@ -349,18 +346,15 @@ void bsplines3d::apply_adjoint(bool add, data_t * pmod, const data_t * pdat){
 
     if (!add) memset(pmod, 0, _domain.getN123()*sizeof(data_t));
 
-    #pragma omp parallel for private(x,y,z)
+    #pragma omp parallel for
     for (int ic=0; ic<nc; ic++){
         for (int iy=0; iy<Y.n; iy++){
-            y = iy*Y.d+Y.o;
             for (int ix=0; ix<X.n; ix++){
-                x = ix*X.d+X.o;
                 for (int iz=0; iz<Z.n; iz++){
-                    z = iz*Z.d+Z.o;
-                    for (int k=_kymin[iy]; k<_kymin[iy]+4; k++){
-                        for (int i=_kxmin[ix]; i<_kxmin[ix]+4; i++){
-                            for (int j=_kzmin[iz]; j<_kzmin[iz]+4; j++){
-                                pm[ic][k][i][j] += N3(k,y,_ky)*N3(i,x,_kx)*N3(j,z,_kz)*pd[ic][iy][ix][iz];
+                    for (int k=0; k<4; k++){
+                        for (int i=0; i<4; i++){
+                            for (int j=0; j<4; j++){
+                                pm[ic][k+_kymin[iy]][i+_kxmin[ix]][j+_kzmin[iz]] += _N3y[k][iy]*_N3x[i][ix]*_N3z[j][iz]*pd[ic][iy][ix][iz];
                             }
                         }
                     }

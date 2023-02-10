@@ -32,6 +32,7 @@ endif()
 
 set(HEADERS ${INC_DIR}/injector.hpp
                 ${INC_DIR}/IO.hpp
+                ${INC_DIR}/lsolver.hpp
                 ${INC_DIR}/misc.hpp
                 ${INC_DIR}/nlsolver.hpp
                 ${INC_DIR}/operator.hpp
