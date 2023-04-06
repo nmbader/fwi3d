@@ -457,6 +457,7 @@ static inline data_t c11b(const data_t ** par, int i){return 2*(1+2*par[4][i])*p
 static inline data_t c11c(const data_t ** par, int i){return (1+2*par[4][i])*par[0][i];} // e.g. = c11c=(1+2.eps).lambda
 static inline data_t c12(const data_t ** par, int i){return (1+2*par[4][i])*(par[0][i]+2*par[1][i])-2*par[5][i];} // e.g. = c12=c11-2.c66 
 static inline data_t simp(const data_t ** par, int i){return 0.5*sqrt(par[1][i]*par[2][i]);} // e.g. = 1/2 sqrt(rho.mu)
+static inline data_t simp2(const data_t ** par, int i){return 0.5*sqrt(par[1][i]*par[5][i]);} // e.g. = 1/2 sqrt(rho.c66)
 static inline data_t pimp(const data_t ** par, int i){return 0.5*sqrt((par[0][i]+2*par[1][i])*par[2][i]);} // e.g. = 1/2 sqrt(rho.(lambda+2 mu))
 static inline data_t pimp2(const data_t ** par, int i){return 0.5*sqrt((1+2*par[4][i])*(par[0][i]+2*par[1][i])*par[2][i]);} // e.g. = 1/2 sqrt(rho.(1+2.eps).(lambda+2 mu))
 static inline data_t aimp(const data_t ** par, int i){return 0.5/sqrt(par[0][i]/par[1][i]);} // e.g. = 1/(2.sqrt(rho.K))
