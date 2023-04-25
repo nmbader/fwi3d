@@ -1,30 +1,37 @@
 #include "bsplines.hpp"
 
+#define ZERO 1e-16
+
+// B-splines functions of order 0, 1, 2, 3
+// N0
 data_t N0(int i, data_t u, const std::vector<data_t> &uk){
     if ((u<uk[i]) || (u>=uk[i+1])) return 0;
     else return 1;
 }
-
+// N1
 data_t N1(int i, data_t u, const std::vector<data_t> &uk){
-    if ((uk[i+1]-uk[i]==0) && (uk[i+2]-uk[i+1]==0)) return 0;
-    else if  ((uk[i+1]-uk[i]==0) && (uk[i+2]-uk[i+1]!=0)) return (uk[i+2]-u)/(uk[i+2]-uk[i+1])*N0(i+1,u,uk);
-    else if ((uk[i+1]-uk[i]!=0) && (uk[i+2]-uk[i+1]==0)) return (u-uk[i])/(uk[i+1]-uk[i])*N0(i,u,uk);
+    if (std::abs(uk[i+1]-uk[i])<ZERO && std::abs(uk[i+2]-uk[i+1])<ZERO) return 0;
+    else if  (std::abs(uk[i+1]-uk[i])<ZERO && std::abs(uk[i+2]-uk[i+1])>=ZERO) return (uk[i+2]-u)/(uk[i+2]-uk[i+1])*N0(i+1,u,uk);
+    else if (std::abs(uk[i+1]-uk[i])>=ZERO && std::abs(uk[i+2]-uk[i+1])<ZERO) return (u-uk[i])/(uk[i+1]-uk[i])*N0(i,u,uk);
     else return (u-uk[i])/(uk[i+1]-uk[i])*N0(i,u,uk) + (uk[i+2]-u)/(uk[i+2]-uk[i+1])*N0(i+1,u,uk);
 }
 
+// N2
 data_t N2(int i, data_t u, const std::vector<data_t> &uk){
-    if ((uk[i+2]-uk[i]==0) && (uk[i+3]-uk[i+1]==0)) return 0;
-    else if  ((uk[i+2]-uk[i]==0) && (uk[i+3]-uk[i+1]!=0))return (uk[i+3]-u)/(uk[i+3]-uk[i+1])*N1(i+1,u,uk);
-    else if ((uk[i+2]-uk[i]!=0) && (uk[i+3]-uk[i+1]==0)) return (u-uk[i])/(uk[i+2]-uk[i])*N1(i,u,uk);
+    if (std::abs(uk[i+2]-uk[i])<ZERO && std::abs(uk[i+3]-uk[i+1])<ZERO) return 0;
+    else if  (std::abs(uk[i+2]-uk[i])<ZERO && std::abs(uk[i+3]-uk[i+1])>=ZERO) return (uk[i+3]-u)/(uk[i+3]-uk[i+1])*N1(i+1,u,uk);
+    else if (std::abs(uk[i+2]-uk[i])>=ZERO && std::abs(uk[i+3]-uk[i+1])<ZERO) return (u-uk[i])/(uk[i+2]-uk[i])*N1(i,u,uk);
     else return (u-uk[i])/(uk[i+2]-uk[i])*N1(i,u,uk) + (uk[i+3]-u)/(uk[i+3]-uk[i+1])*N1(i+1,u,uk);
 }
 
+// N3
 data_t N3(int i, data_t u, const std::vector<data_t> &uk){
-    if ((uk[i+3]-uk[i]==0) && (uk[i+4]-uk[i+1]==0)) return 0;
-    else if  ((uk[i+3]-uk[i]==0) && (uk[i+4]-uk[i+1]!=0)) return (uk[i+4]-u)/(uk[i+4]-uk[i+1])*N2(i+1,u,uk);
-    else if ((uk[i+3]-uk[i]!=0) && (uk[i+4]-uk[i+1]==0)) return (u-uk[i])/(uk[i+3]-uk[i])*N2(i,u,uk);
+    if (std::abs(uk[i+3]-uk[i])<ZERO && std::abs(uk[i+4]-uk[i+1])<ZERO) return 0;
+    else if  (std::abs(uk[i+3]-uk[i])<ZERO && std::abs(uk[i+4]-uk[i+1])>=ZERO) return (uk[i+4]-u)/(uk[i+4]-uk[i+1])*N2(i+1,u,uk);
+    else if (std::abs(uk[i+3]-uk[i])>=ZERO && std::abs(uk[i+4]-uk[i+1])<ZERO) return (u-uk[i])/(uk[i+3]-uk[i])*N2(i,u,uk);
     else return (u-uk[i])/(uk[i+3]-uk[i])*N2(i,u,uk) + (uk[i+4]-u)/(uk[i+4]-uk[i+1])*N2(i+1,u,uk);
 }
+
 
 void setKnot(std::vector<data_t> &u, std::vector<data_t> &c, std::vector<int> &m){
     successCheck(c.size() == m.size(),"Control and multiplicity vectors must have the same size\n");
@@ -536,3 +543,5 @@ void bsfillin3d::apply_adjoint(bool add, data_t * pmod, const data_t * pdat){
         }
     }
 }
+
+#undef ZERO

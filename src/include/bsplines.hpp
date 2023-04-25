@@ -185,18 +185,18 @@ public:
         _ky = ky;
         _kz = kz;
 
-        _kx[kx.size()-1] += 1e-6;
-        _kx[kx.size()-2] += 1e-6;
-        _kx[kx.size()-3] += 1e-6;
-        _kx[kx.size()-4] += 1e-6;
-        _ky[ky.size()-1] += 1e-6;
-        _ky[ky.size()-2] += 1e-6;
-        _ky[ky.size()-3] += 1e-6;
-        _ky[ky.size()-4] += 1e-6;
-        _kz[kz.size()-1] += 1e-6;
-        _kz[kz.size()-2] += 1e-6;
-        _kz[kz.size()-3] += 1e-6;
-        _kz[kz.size()-4] += 1e-6;
+        _kx[kx.size()-1] += range.getAxis(2).d*1e-03;
+        _kx[kx.size()-2] += range.getAxis(2).d*1e-03;
+        _kx[kx.size()-3] += range.getAxis(2).d*1e-03;
+        _kx[kx.size()-4] += range.getAxis(2).d*1e-03;
+        _ky[ky.size()-1] += range.getAxis(3).d*1e-03;
+        _ky[ky.size()-2] += range.getAxis(3).d*1e-03;
+        _ky[ky.size()-3] += range.getAxis(3).d*1e-03;
+        _ky[ky.size()-4] += range.getAxis(3).d*1e-03;
+        _kz[kz.size()-1] += range.getAxis(1).d*1e-03;
+        _kz[kz.size()-2] += range.getAxis(1).d*1e-03;
+        _kz[kz.size()-3] += range.getAxis(1).d*1e-03;
+        _kz[kz.size()-4] += range.getAxis(1).d*1e-03;
 
         axis<data_t> Z = _range.getAxis(1);
         axis<data_t> X = _range.getAxis(2);
@@ -290,14 +290,14 @@ public:
         _kx = kx;
         _kz = kz;
 
-        _kx[kx.size()-1] += 1e-6;
-        _kx[kx.size()-2] += 1e-6;
-        _kx[kx.size()-3] += 1e-6;
-        _kx[kx.size()-4] += 1e-6;
-        _kz[kz.size()-1] += 1e-6;
-        _kz[kz.size()-2] += 1e-6;
-        _kz[kz.size()-3] += 1e-6;
-        _kz[kz.size()-4] += 1e-6;
+        _kx[kx.size()-1] += range.getAxis(2).d*1e-03;
+        _kx[kx.size()-2] += range.getAxis(2).d*1e-03;
+        _kx[kx.size()-3] += range.getAxis(2).d*1e-03;
+        _kx[kx.size()-4] += range.getAxis(2).d*1e-03;
+        _kz[kz.size()-1] += range.getAxis(1).d*1e-03;
+        _kz[kz.size()-2] += range.getAxis(1).d*1e-03;
+        _kz[kz.size()-3] += range.getAxis(1).d*1e-03;
+        _kz[kz.size()-4] += range.getAxis(1).d*1e-03;
 
         axis<data_t> Z = _range.getAxis(1);
         axis<data_t> X = _range.getAxis(2);
@@ -357,10 +357,10 @@ public:
         _range = range;
         _kz = kz;
 
-        _kz[kz.size()-1] += 1e-6;
-        _kz[kz.size()-2] += 1e-6;
-        _kz[kz.size()-3] += 1e-6;
-        _kz[kz.size()-4] += 1e-6;
+        _kz[kz.size()-1] += range.getAxis(1).d*1e-03;
+        _kz[kz.size()-2] += range.getAxis(1).d*1e-03;
+        _kz[kz.size()-3] += range.getAxis(1).d*1e-03;
+        _kz[kz.size()-4] += range.getAxis(1).d*1e-03;
 
         axis<data_t> Z = _range.getAxis(1);
         data_t z;
