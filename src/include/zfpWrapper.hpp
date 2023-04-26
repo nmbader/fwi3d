@@ -46,8 +46,11 @@ public:
             }
         }
 #else
-        _full_wfld = std::vector<std::shared_ptr<vecReg<data_t> > >(nt, std::shared_ptr<vecReg<data_t> >(new vecReg<data_t>(hypercube<data_t>(axes[0], axes[1], axes[2], axes[3]))));
-        for (int it=0; it<nt; it++) _full_wfld[it]->zero();
+        for (int it=0; it<nt; it++){
+            std::shared_ptr<vecReg<data_t> > v = std::make_shared<vecReg<data_t> >(hypercube<data_t>(axes[0], axes[1], axes[2], axes[3]));
+            v->zero();
+            _full_wfld.push_back(v);
+        }
 #endif
 
     }
