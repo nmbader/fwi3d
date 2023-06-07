@@ -262,6 +262,28 @@ void analyzeModel(const hypercube<data_t> &domain, std::shared_ptr<vecReg<data_t
 
         if (par.nmodels==6)
         {
+            // check that Thomsen delta falls inside the admissible range at all locations -0.5 ( 1 - Vs0^2/Vp0^2 ) < delta < 2 ( Vp0^2/Vs0^2 - 1 )^-1
+            // see Chapter 1 in Ilya Tsvankin book
+            const data_t * pvp = model->getCVals();
+            const data_t * pvs = model->getCVals()+nx*ny*nz;
+            data_t * pdel = model->getVals()+3*nx*ny*nz;
+
+            bool check=true;
+            data_t val1=0, val2=0;
+            for (int i=0; i<nx*nz; i++) {
+                val1 = -0.5*(1 - pvs[i]*pvs[i]/(pvp[i]*pvp[i]) );
+                val2 = 2.0 / (pvp[i]*pvp[i]/(pvs[i]*pvs[i]) - 1);
+                if (pdel[i] < val1 ){
+                    check = false;
+                    pdel[i] = 0.9999*val1;
+                }
+                else if (pdel[i] > val2 ){
+                    check = false;
+                    pdel[i] = 0.9999*val2;
+                }
+            }
+            if (par.verbose>1 && !check) fprintf(stderr,"WARNING: Thomsen delta falls outside the admissible range at some locations and will be clipped accordingly\n");
+ 
             delmin = model->min(3*ny*nx*nz,4*ny*nx*nz);
             delmax = model->max(3*ny*nx*nz,4*ny*nx*nz);
             epsmin = model->min(4*ny*nx*nz,5*ny*nx*nz);
@@ -336,7 +358,7 @@ void analyzeModel(const hypercube<data_t> &domain, std::shared_ptr<vecReg<data_t
         par.vmax=vpmax;
         par.vmin=vsmin;
 
-        // compute the maximum horizontal P-wave velocity
+        // compute the maximum vertical or horizontal P-wave velocity
         if (par.nmodels==6) {
             std::shared_ptr<vecReg<data_t> > temp = std::make_shared<vecReg<data_t> >(hypercube<data_t>(Z,X,Y));
             data_t * ptemp = temp->getVals();
@@ -345,7 +367,7 @@ void analyzeModel(const hypercube<data_t> &domain, std::shared_ptr<vecReg<data_t
             #pragma omp parallel for
             for (int i=0; i<nx*ny*nz; i++) ptemp[i] = pvp[i]*sqrt(1+2*pe[i]);
             
-            par.vmax = temp->max();
+            par.vmax = std::max(temp->max(), par.vmax);
         }
     }
 
