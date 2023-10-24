@@ -1,0 +1,22 @@
+# Sources and receivers locations (all coordinates in km)
+# col 1: source identifier
+# col 2: source x coordinate
+# col 3: source y coordinate
+# col 4: source z coordinate
+# the first 4 columns must be repeated for each receiver
+# col 5: receiver x coordinate
+# col 6: receiver y coordinate
+# col 7: receiver z coordinate
+# col 8 (optional): DAS channel dip angle measured in radians from the x-axis clockwise.
+# col 9 (optional): DAS channel azimuth angle measured in radians from the x-axis anti-clockwise when looked from above.
+# These two parameter are used when modeling DAS data assuming that the DAS fiber is straight over the gauge distance (typically a few meters)
+1 0.5 0.5 0.1 0.5 0.5 0.2 0.0 0.0
+1 0.5 0.5 0.1 0.5 0.5 0.3 0.0 0.0
+1 0.5 0.5 0.1 0.5 0.5 0.4 0.0 0.0
+1 0.5 0.5 0.1 0.5 0.5 0.5 0.0 0.0
+1 0.5 0.5 0.1 0.5 0.5 0.6 0.0 0.0
+2 0.6 0.5 0.1 0.6 0.5 0.2 0.0 0.0
+2 0.6 0.5 0.1 0.6 0.5 0.3 0.0 0.0
+2 0.6 0.5 0.1 0.6 0.5 0.4 0.0 0.0
+2 0.6 0.5 0.1 0.6 0.5 0.5 0.0 0.0
+2 0.6 0.5 0.1 0.6 0.5 0.6 0.0 0.0

@@ -6,5 +6,5 @@
 **/build*
 **/test*
 **/local*
-**/examples
-README.md
+**/examples/data
+**/external/nlsolvers
