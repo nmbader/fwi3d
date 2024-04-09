@@ -130,6 +130,12 @@ void readParam(int argc, char **argv, param &par){
     readParam<data_t>(argc, argv, "vsmax", par.vsmax);
     readParam<data_t>(argc, argv, "rhomin", par.rhomin);
     readParam<data_t>(argc, argv, "rhomax", par.rhomax);
+    readParam<data_t>(argc, argv, "deltamin", par.deltamin);
+    readParam<data_t>(argc, argv, "deltamax", par.deltamax);
+    readParam<data_t>(argc, argv, "epsilonmin", par.epsilonmin);
+    readParam<data_t>(argc, argv, "epsilonmax", par.epsilonmax);
+    readParam<data_t>(argc, argv, "gammamin", par.gammamin);
+    readParam<data_t>(argc, argv, "gammamax", par.gammamax);
     readParam<data_t>(argc, argv, "bs_controlx", par.bs_controlx);
     readParam<data_t>(argc, argv, "bs_controly", par.bs_controly);
     readParam<data_t>(argc, argv, "bs_controlz", par.bs_controlz);
