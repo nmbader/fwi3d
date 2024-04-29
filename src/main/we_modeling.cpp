@@ -85,6 +85,8 @@ int main(int argc, char **argv){
         rcv->zero();
         op->forward(false,model,rcv);
 
+        if (verbose>1) fprintf(stderr,"\nFinish modeling shot %d by process %d\n",s, rank);
+
 // Save one full wavefield if requested
         if ((rank==0) && (wavefield_file!="none") && (op->_par.sub)>0) {
             std::shared_ptr<vecReg<data_t> > full;

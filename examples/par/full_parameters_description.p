@@ -57,7 +57,7 @@ rx0=0.0
 rz0=0.2
 ry0=0.0
 
-# increment in x and z (in km)
+# increment in x, y and z (in km)
 sxinc=0.1
 szinc=0.0
 syinc=0.1
@@ -145,8 +145,10 @@ rhomin=0
 rhomax=8
 deltamin=-0.5
 deltamax=1
-epsilonmin=-0.5
+epsilonmin=0
 epsilonmax=1
+gammamin=0
+gammamax=1
 
 #############################################
 ######### inversion parameters ##############
